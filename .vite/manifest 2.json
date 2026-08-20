@@ -1,0 +1,182 @@
+{
+  "_V2Portfolio-DmllCrjy.css": {
+    "file": "assets/V2Portfolio-DmllCrjy.css",
+    "src": "_V2Portfolio-DmllCrjy.css"
+  },
+  "_V2Portfolio.module-CXZdcCJH.js": {
+    "file": "assets/V2Portfolio.module-CXZdcCJH.js",
+    "name": "V2Portfolio.module",
+    "css": [
+      "assets/V2Portfolio-DmllCrjy.css"
+    ]
+  },
+  "_framework-CXnKph_e.js": {
+    "file": "assets/framework-CXnKph_e.js",
+    "name": "framework",
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js"
+    ]
+  },
+  "_query-Ddm8W4QT.js": {
+    "file": "assets/query-Ddm8W4QT.js",
+    "name": "query"
+  },
+  "_rolldown-runtime-S-ySWqyJ.js": {
+    "file": "assets/rolldown-runtime-S-ySWqyJ.js",
+    "name": "rolldown-runtime"
+  },
+  "app/v2/ContactLinks.tsx": {
+    "file": "assets/ContactLinks-nVHWor7S.js",
+    "name": "ContactLinks",
+    "src": "app/v2/ContactLinks.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_V2Portfolio.module-CXZdcCJH.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "app/v2/DraggableBotanical.tsx": {
+    "file": "assets/DraggableBotanical-ft1oAB_z.js",
+    "name": "DraggableBotanical",
+    "src": "app/v2/DraggableBotanical.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_V2Portfolio.module-CXZdcCJH.js",
+      "node_modules/vinext/dist/shims/image.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "app/v2/EditorialScrollGallery.tsx": {
+    "file": "assets/EditorialScrollGallery-CoPIlnac.js",
+    "name": "EditorialScrollGallery",
+    "src": "app/v2/EditorialScrollGallery.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_V2Portfolio.module-CXZdcCJH.js",
+      "node_modules/vinext/dist/shims/image.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "app/v2/MerchScrollGallery.tsx": {
+    "file": "assets/MerchScrollGallery-BHO_fZd9.js",
+    "name": "MerchScrollGallery",
+    "src": "app/v2/MerchScrollGallery.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_V2Portfolio.module-CXZdcCJH.js",
+      "node_modules/vinext/dist/shims/image.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "app/v2/OpeningLogoIdent.tsx": {
+    "file": "assets/OpeningLogoIdent-BSyC6RQo.js",
+    "name": "OpeningLogoIdent",
+    "src": "app/v2/OpeningLogoIdent.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_V2Portfolio.module-CXZdcCJH.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "app/v2/SmoothScroll.tsx": {
+    "file": "assets/SmoothScroll-BZ9HsUPs.js",
+    "name": "SmoothScroll",
+    "src": "app/v2/SmoothScroll.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "app/v2/WeightedHero.tsx": {
+    "file": "assets/WeightedHero-CL5KS-Gi.js",
+    "name": "WeightedHero",
+    "src": "app/v2/WeightedHero.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_V2Portfolio.module-CXZdcCJH.js",
+      "node_modules/vinext/dist/shims/image.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "node_modules/vinext/dist/shims/image.js": {
+    "file": "assets/image-qojrj1Wm.js",
+    "name": "image",
+    "src": "node_modules/vinext/dist/shims/image.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "node_modules/vinext/dist/shims/layout-segment-context.js": {
+    "file": "assets/layout-segment-context-EG7y_kr3.js",
+    "name": "layout-segment-context",
+    "src": "node_modules/vinext/dist/shims/layout-segment-context.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "virtual:vinext-app-browser-entry",
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "node_modules/vinext/dist/shims/link.js": {
+    "file": "assets/link-DcnE8BcQ.js",
+    "name": "link",
+    "src": "node_modules/vinext/dist/shims/link.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "virtual:vinext-app-browser-entry",
+      "_framework-CXnKph_e.js",
+      "_query-Ddm8W4QT.js"
+    ],
+    "dynamicImports": [
+      "node_modules/vinext/dist/shims/router.js"
+    ]
+  },
+  "node_modules/vinext/dist/shims/router.js": {
+    "file": "assets/router-cfrqAiGy.js",
+    "name": "router",
+    "src": "node_modules/vinext/dist/shims/router.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "virtual:vinext-app-browser-entry",
+      "_framework-CXnKph_e.js",
+      "_query-Ddm8W4QT.js"
+    ],
+    "dynamicImports": [
+      "_framework-CXnKph_e.js"
+    ]
+  },
+  "virtual:vinext-app-browser-entry": {
+    "file": "assets/index-D06caKPU.js",
+    "name": "index",
+    "src": "virtual:vinext-app-browser-entry",
+    "isEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_framework-CXnKph_e.js"
+    ],
+    "dynamicImports": [
+      "node_modules/vinext/dist/shims/layout-segment-context.js",
+      "app/v2/WeightedHero.tsx",
+      "virtual:vinext-app-browser-entry",
+      "app/v2/ContactLinks.tsx",
+      "app/v2/DraggableBotanical.tsx",
+      "node_modules/vinext/dist/shims/image.js",
+      "app/v2/OpeningLogoIdent.tsx",
+      "app/v2/SmoothScroll.tsx",
+      "app/v2/MerchScrollGallery.tsx",
+      "node_modules/vinext/dist/shims/link.js",
+      "app/v2/EditorialScrollGallery.tsx"
+    ]
+  }
+}
