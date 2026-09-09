@@ -10,7 +10,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "assets/layout-segment-context-BeQQzasf.js",
+    "file": "assets/layout-segment-context-CRMT8f9M.js",
     "name": "layout-segment-context",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -21,7 +21,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js": {
-    "file": "assets/link-BQIyQFTV.js",
+    "file": "assets/link-3M5gvWe8.js",
     "name": "link",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -35,7 +35,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js": {
-    "file": "assets/router-Y1o2EMmV.js",
+    "file": "assets/router-BkANMBPk.js",
     "name": "router",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js",
     "isDynamicEntry": true,
@@ -49,22 +49,23 @@
       "_framework-CXnKph_e.js"
     ]
   },
-  "_V2Portfolio-CMzb8eoG.css": {
-    "file": "assets/V2Portfolio-CMzb8eoG.css",
-    "src": "_V2Portfolio-CMzb8eoG.css"
+  "_V2Portfolio-a7gBSWY_.css": {
+    "file": "assets/V2Portfolio-a7gBSWY_.css",
+    "src": "_V2Portfolio-a7gBSWY_.css"
   },
-  "_V2Portfolio.module-DUue-86B.js": {
-    "file": "assets/V2Portfolio.module-DUue-86B.js",
+  "_V2Portfolio.module-mHY7pdnT.js": {
+    "file": "assets/V2Portfolio.module-mHY7pdnT.js",
     "name": "V2Portfolio.module",
     "css": [
-      "assets/V2Portfolio-CMzb8eoG.css"
+      "assets/V2Portfolio-a7gBSWY_.css"
     ]
   },
-  "_check-CbH9495B.js": {
-    "file": "assets/check-CbH9495B.js",
+  "_check-BOKWwQmK.js": {
+    "file": "assets/check-BOKWwQmK.js",
     "name": "check",
     "imports": [
-      "_mail-BnQN5fFQ.js"
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_framework-CXnKph_e.js"
     ]
   },
   "_framework-CXnKph_e.js": {
@@ -74,42 +75,33 @@
       "_rolldown-runtime-S-ySWqyJ.js"
     ]
   },
-  "_linkedin-LtdFerur.js": {
-    "file": "assets/linkedin-LtdFerur.js",
+  "_linkedin-C0XMGgUR.js": {
+    "file": "assets/linkedin-C0XMGgUR.js",
     "name": "linkedin",
     "imports": [
-      "_mail-BnQN5fFQ.js"
-    ]
-  },
-  "_mail-BnQN5fFQ.js": {
-    "file": "assets/mail-BnQN5fFQ.js",
-    "name": "mail",
-    "imports": [
-      "_rolldown-runtime-S-ySWqyJ.js",
-      "_framework-CXnKph_e.js"
+      "_check-BOKWwQmK.js"
     ]
   },
   "_rolldown-runtime-S-ySWqyJ.js": {
     "file": "assets/rolldown-runtime-S-ySWqyJ.js",
     "name": "rolldown-runtime"
   },
-  "_x-D3hltY7s.js": {
-    "file": "assets/x-D3hltY7s.js",
+  "_x-DP4C_Q2-.js": {
+    "file": "assets/x-DP4C_Q2-.js",
     "name": "x",
     "imports": [
-      "_mail-BnQN5fFQ.js"
+      "_check-BOKWwQmK.js"
     ]
   },
   "app/motion-concepts/MotionConcept.tsx": {
-    "file": "assets/MotionConcept-C_dSP2d7.js",
+    "file": "assets/MotionConcept-ClusyB6e.js",
     "name": "MotionConcept",
     "src": "app/motion-concepts/MotionConcept.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-S-ySWqyJ.js",
-      "_mail-BnQN5fFQ.js",
-      "_x-D3hltY7s.js",
-      "_check-CbH9495B.js",
+      "_check-BOKWwQmK.js",
+      "_x-DP4C_Q2-.js",
       "_framework-CXnKph_e.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js"
     ],
@@ -118,21 +110,33 @@
     ]
   },
   "app/v2/ContactLinks.tsx": {
-    "file": "assets/ContactLinks-8Ss15Xg5.js",
+    "file": "assets/ContactLinks-CDvxEvXb.js",
     "name": "ContactLinks",
     "src": "app/v2/ContactLinks.tsx",
     "isDynamicEntry": true,
     "imports": [
-      "_rolldown-runtime-S-ySWqyJ.js",
-      "_mail-BnQN5fFQ.js",
-      "_check-CbH9495B.js",
-      "_linkedin-LtdFerur.js",
+      "app/v2/CopyEmailButton.tsx",
+      "_linkedin-C0XMGgUR.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-DUue-86B.js"
+      "_V2Portfolio.module-mHY7pdnT.js"
+    ]
+  },
+  "app/v2/CopyEmailButton.tsx": {
+    "file": "assets/CopyEmailButton-DZf2ObD9.js",
+    "name": "CopyEmailButton",
+    "src": "app/v2/CopyEmailButton.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-S-ySWqyJ.js",
+      "_check-BOKWwQmK.js",
+      "_framework-CXnKph_e.js"
+    ],
+    "css": [
+      "assets/CopyEmailButton-CATGUXT8.css"
     ]
   },
   "app/v2/DraggableBotanical.tsx": {
-    "file": "assets/DraggableBotanical-o-K3SMG2.js",
+    "file": "assets/DraggableBotanical-CCKNpTrP.js",
     "name": "DraggableBotanical",
     "src": "app/v2/DraggableBotanical.tsx",
     "isDynamicEntry": true,
@@ -140,11 +144,11 @@
       "_rolldown-runtime-S-ySWqyJ.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-DUue-86B.js"
+      "_V2Portfolio.module-mHY7pdnT.js"
     ]
   },
   "app/v2/EditorialScrollGallery.tsx": {
-    "file": "assets/EditorialScrollGallery-Bo2zTxk5.js",
+    "file": "assets/EditorialScrollGallery-DTvfw-TG.js",
     "name": "EditorialScrollGallery",
     "src": "app/v2/EditorialScrollGallery.tsx",
     "isDynamicEntry": true,
@@ -152,11 +156,11 @@
       "_rolldown-runtime-S-ySWqyJ.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-DUue-86B.js"
+      "_V2Portfolio.module-mHY7pdnT.js"
     ]
   },
   "app/v2/MerchScrollGallery.tsx": {
-    "file": "assets/MerchScrollGallery-huKXxxkM.js",
+    "file": "assets/MerchScrollGallery-D6E07KUy.js",
     "name": "MerchScrollGallery",
     "src": "app/v2/MerchScrollGallery.tsx",
     "isDynamicEntry": true,
@@ -164,20 +168,21 @@
       "_rolldown-runtime-S-ySWqyJ.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-DUue-86B.js"
+      "_V2Portfolio.module-mHY7pdnT.js"
     ]
   },
   "app/v2/PortfolioMotion.tsx": {
-    "file": "assets/PortfolioMotion-6wAW7I16.js",
+    "file": "assets/PortfolioMotion-CF0BlvwX.js",
     "name": "PortfolioMotion",
     "src": "app/v2/PortfolioMotion.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-S-ySWqyJ.js",
       "virtual:vinext-app-browser-entry",
-      "_mail-BnQN5fFQ.js",
-      "_x-D3hltY7s.js",
-      "_linkedin-LtdFerur.js",
+      "_check-BOKWwQmK.js",
+      "_x-DP4C_Q2-.js",
+      "app/v2/CopyEmailButton.tsx",
+      "_linkedin-C0XMGgUR.js",
       "_framework-CXnKph_e.js",
       "app/v2/WorkCard.tsx"
     ],
@@ -185,7 +190,7 @@
       "app/v2/cassette-scene.ts"
     ],
     "css": [
-      "assets/PortfolioMotion-CJFQlDLv.css"
+      "assets/PortfolioMotion-BS1FPhM1.css"
     ]
   },
   "app/v2/ScrollMotion.tsx": {
@@ -225,7 +230,7 @@
     "isDynamicEntry": true
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "assets/index-C3sHjTBO.js",
+    "file": "assets/index-DKW68SNz.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
@@ -241,6 +246,7 @@
       "app/v2/DraggableBotanical.tsx",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "app/v2/SmoothScroll.tsx",
+      "app/v2/CopyEmailButton.tsx",
       "app/v2/MerchScrollGallery.tsx",
       "app/v2/ScrollMotion.tsx",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js",
