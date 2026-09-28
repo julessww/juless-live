@@ -1,0 +1,75 @@
+name: Verify live Ensō mobile slow fonts
+on:
+  push:
+    branches: [verify/enso-exact-5ca2444a86]
+    paths: [.github/workflows/enso-mobile-slow-live.yml]
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Respect rate-limit cooldown
+        run: sleep 60
+      - name: Recheck only the interrupted scenario
+        run: |
+          npm init -y >/dev/null
+          npm install --save-exact playwright-core@1.55.1 >/dev/null
+          mkdir results
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > mobile.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+          const context=await browser.newContext({viewport:{width:390,height:900}});
+          await context.route(/\.woff2?(\?|$)/,async route=>{await new Promise(r=>setTimeout(r,2500));await route.continue().catch(()=>{});});
+          await context.addInitScript(()=>{
+            window.__ready=false;window.__reveals=0;window.__frames=[];
+            const add=EventTarget.prototype.addEventListener;
+            EventTarget.prototype.addEventListener=function(...a){if(this instanceof HTMLElement&&this.tagName==='MAIN'&&a[0]==='click')window.__ready=true;return add.apply(this,a)};
+            const animate=Element.prototype.animate;
+            Element.prototype.animate=function(...a){if(this.id==='merch-heading')window.__reveals++;return animate.apply(this,a)};
+          });
+          const page=await context.newPage();page.setDefaultTimeout(20000);
+          const errors=[];page.on('pageerror',e=>errors.push(e.message));
+          const assets=[];page.on('response',r=>{if(r.url().includes('/assets/')&&r.url().includes('5ca2444a86'))assets.push(r)});
+          let result={pass:false};
+          try{
+            const response=await page.goto('https://jules.social/',{waitUntil:'domcontentloaded'});
+            assert.equal(response.status(),200,'Homepage HTTP status');
+            await page.waitForFunction(()=>window.__ready);
+            await page.locator('nav a[href="#enso"]').click();
+            await page.evaluate(()=>{const start=performance.now();function frame(){const h=document.getElementById('merch-heading');window.__frames.push({t:performance.now()-start,y:scrollY,doc:document.documentElement.scrollHeight,top:h.getBoundingClientRect().top,clip:getComputedStyle(h).clipPath,playing:[...document.querySelectorAll('#enso video')].filter(v=>!v.paused).length});if(performance.now()-start<3200)requestAnimationFrame(frame)}requestAnimationFrame(frame)});
+            await page.waitForTimeout(3500);
+            const frames=await page.evaluate(()=>window.__frames),stable=frames.filter(f=>f.t>150),last=frames.at(-1);
+            assert(stable.length>10);assert.equal(last.clip,'none');assert(last.top>0&&last.top<900);
+            assert(stable.every(f=>f.playing<=1));
+            assert(Math.max(...stable.map(f=>f.y))-Math.min(...stable.map(f=>f.y))<=1,'Late scroll correction');
+            assert(Math.max(...stable.map(f=>f.doc))-Math.min(...stable.map(f=>f.doc))<=1,'Late document-height shift');
+            assert.equal(await page.evaluate(()=>window.__reveals),0);
+            await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+            await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(350);
+            assert.equal(new URL(page.url()).hash,'#enso');assert.equal(await page.evaluate(()=>window.__reveals),0);
+            assert.deepEqual(errors,[]);
+            const module=assets.find(r=>r.url().endsWith('/PortfolioMotion-stable-5ca2444a86.js'));
+            assert(module,'Verified module was requested');assert.equal(module.status(),200);
+            assert.equal(createHash('sha256').update(await module.body()).digest('hex'),'67fea1c2339d9895b4ac0d852eb69a11634d061fbb2f4cb4c2cd55473a8bffe7');
+            await page.screenshot({path:'results/mobile-delayed-fonts.png'});
+            result={pass:true,width:390,mode:'delayed-fonts',version:'5ca2444a86',last,frames:frames.length,pageErrors:errors};
+          }catch(error){result={pass:false,error:error.message,pageErrors:errors};}
+          await writeFile('results/result.json',JSON.stringify(result,null,2));console.log('MOBILE LIVE RESULT',JSON.stringify(result));
+          await context.close();await browser.close();assert(result.pass,'Mobile slow-font live check did not pass');
+          JS
+          node mobile.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-mobile-slow-live
+          path: results/
+          retention-days: 3
