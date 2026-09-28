@@ -1,0 +1,108 @@
+name: Stage tested Ensō 5ca2444a86
+on:
+  push:
+    branches: [verify/enso-exact-5ca2444a86]
+    paths: [.github/workflows/enso-exact-5ca2444a86.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          path: site
+      - name: Reproduce exactly reviewed asset graph
+        run: |
+          mkdir results
+          cat > preview-helper.js <<'JS'
+          function startMerchPreview(element, automatic = false) {
+              const gallery = element.closest('#enso');
+              const previews = Array.from(gallery?.querySelectorAll('video') ?? []);
+              if (automatic && previews.some(other => other !== element && !other.paused))
+                  return;
+              previews.forEach(other => {
+                  if (other !== element)
+                      other.pause();
+              });
+              void element.play().catch(() => { });
+          }
+          JS
+          cat > patch-site.py <<'PY'
+          from pathlib import Path
+          import re,hashlib,json,sys
+          root=Path(sys.argv[1]);helper=Path(sys.argv[2]).read_text()
+          module=root/'assets/PortfolioMotion-BY701fA3.js';oldmodule=module.read_text()
+          pattern=r'([A-Za-z_$][\w$]*)\.play\(\)\.catch\(\(\)=>\{\}\)'
+          matches=list(re.finditer(pattern,oldmodule));assert len(matches)==2,[(x.group(),x.start()) for x in matches]
+          print('ORIGINAL PLAYBACK CALLS',[(oldmodule[max(0,m.start()-180):m.end()+100]) for m in matches])
+          newmodule=oldmodule
+          for i,m in reversed(list(enumerate(matches))):
+              replacement='startMerchPreview('+m.group(1)+(',true' if i==0 else '')+')'
+              newmodule=newmodule[:m.start()]+replacement+newmodule[m.end():]
+          assert 'function startMerchPreview' not in oldmodule
+          newmodule+='\n'+helper
+          csspath=root/'assets/index-BAkL0943.css';css=csspath.read_text()
+          rules=re.findall(r'@font-face\{[^}]*Jules Aeonik[^}]*\}',css);assert len(rules)==2
+          for rule in rules:
+              assert 'font-display:swap' in rule
+              css=css.replace(rule,rule.replace('font-display:swap','font-display:optional'))
+          css,n=re.subn(r'--font-portfolio:[^;}]+','--font-portfolio:"Jules Aeonik",Arial,sans-serif',css);assert n==1
+          version=hashlib.sha256((newmodule+css).encode()).hexdigest()[:10]
+          mapping={module.name:f'PortfolioMotion-stable-{version}.js',csspath.name:f'index-stable-{version}.css'}
+          originals={p:p.read_text() for p in root.rglob('*') if p.is_file() and '.git' not in p.parts and '.github' not in p.parts and p.suffix in ['.html','.rsc','.js','.json','.css']}
+          while True:
+              extra={p.name:p.stem+f'-stable-{version}'+p.suffix for p,s in originals.items() if p.suffix=='.js' and p.name not in mapping and any(old in s for old in mapping)}
+              if not extra:break
+              mapping.update(extra)
+          def renamed(s):
+              for old,new in mapping.items():s=s.replace(old,new)
+              return s
+          changed=[]
+          for p,original in originals.items():
+              s=newmodule if p==module else css if p==csspath else original
+              s=renamed(s)
+              if p.suffix=='.html' and '</head>' in s:
+                  links=''.join('<link rel="preload" href="/fonts/'+f+'.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>' for f in ['AeonikPro-Regular','AeonikPro-Bold'])
+                  s=s.replace('</head>',links+'</head>',1)
+              dest=p.with_name(mapping.get(p.name,p.name))
+              if s!=original or dest!=p:
+                  dest.write_text(s);changed.append(str(dest.relative_to(root)))
+          manifest={'version':version,'mapping':mapping,'changed':sorted(changed),'sha256':{p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in changed}}
+          Path(sys.argv[3]).write_text(json.dumps(manifest,indent=2))
+          print('PREPARED',version,len(changed),'files')
+          PY
+          python3 patch-site.py site preview-helper.js results/deployment-manifest.json
+          python3 - <<'PY'
+          import hashlib,json,subprocess
+          from pathlib import Path
+          manifest=json.loads(Path('results/deployment-manifest.json').read_text())
+          digest=hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+          assert digest=='5dea69f2d404398dea189826de358a8cd981c567f2375fb8ae7be21fd809bb44',digest
+          assert manifest['version']=='5ca2444a86' and len(manifest['changed'])==34
+          assert subprocess.check_output(['git','-C','site','hash-object','assets/ScrollMotion-CGghoTCK.js'],text=True).strip()=='88274b32accc04c994031ca6e2d5a532845759de'
+          subprocess.run(['git','-C','site','add','--',*manifest['changed']],check=True)
+          actual=subprocess.check_output(['git','-C','site','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(actual)==sorted(manifest['changed'])
+          assert not any(p.startswith(('.github/','fonts/','events/','merch/')) for p in actual)
+          print('PASS: exact 20-scenario-reviewed snapshot; 34 paths; previous heading fix preserved')
+          PY
+          git -C site diff --cached --check
+      - name: Save clean deployment branch only
+        working-directory: site
+        run: |
+          test "$(git ls-remote origin refs/heads/gh-pages | cut -f1)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          test -z "$(git ls-remote origin refs/heads/fix/enso-exact-5ca2444a86)"
+          git switch -c fix/enso-exact-5ca2444a86
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Publish verified font and single-preview stability assets with cache-safe filenames'
+          git push origin HEAD:refs/heads/fix/enso-exact-5ca2444a86
+          git rev-parse HEAD > ../results/deploy-commit.txt
+          git diff HEAD^ HEAD --stat > ../results/changes.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-exact-5ca2444a86
+          path: results/
+          retention-days: 3
