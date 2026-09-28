@@ -1,178 +1,105 @@
-name: Stage exact reviewed Enso snapshot
+name: Verify exact Enso production release
 on:
   push:
     branches: [verify/enso-exact-5ca2444a86]
     paths: [.github/workflows/enso-exact-stage.yml]
 permissions:
-  contents: write
+  contents: read
 jobs:
-  stage:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
-          path: site
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Reproduce exact tested snapshot
+      - name: Install browser tools
         run: |
-          mkdir results
-          cat > results/preview-helper.js <<'JS'
-          function startMerchPreview(element, automatic = false) {
-              const gallery = element.closest('#enso');
-              const previews = Array.from(gallery?.querySelectorAll('video') ?? []);
-              if (automatic && previews.some(other => other !== element && !other.paused))
-                  return;
-              previews.forEach(other => {
-                  if (other !== element)
-                      other.pause();
-              });
-              void element.play().catch(() => { });
-          }
-          JS
-          cat > results/patch-site.py <<'PY'
-          from pathlib import Path
-          import re,hashlib,json,sys
-          root=Path(sys.argv[1]);helper=Path(sys.argv[2]).read_text()
-          module=root/'assets/PortfolioMotion-BY701fA3.js';oldmodule=module.read_text()
-          pattern=r'([A-Za-z_$][\w$]*)\.play\(\)\.catch\(\(\)=>\{\}\)'
-          matches=list(re.finditer(pattern,oldmodule));assert len(matches)==2,[(x.group(),x.start()) for x in matches]
-          print('ORIGINAL PLAYBACK CALLS',[(oldmodule[max(0,m.start()-180):m.end()+100]) for m in matches])
-          newmodule=oldmodule
-          for i,m in reversed(list(enumerate(matches))):
-              replacement='startMerchPreview('+m.group(1)+(',true' if i==0 else '')+')'
-              newmodule=newmodule[:m.start()]+replacement+newmodule[m.end():]
-          assert 'function startMerchPreview' not in oldmodule
-          newmodule+='\n'+helper
-          csspath=root/'assets/index-BAkL0943.css';css=csspath.read_text()
-          rules=re.findall(r'@font-face\{[^}]*Jules Aeonik[^}]*\}',css);assert len(rules)==2
-          for rule in rules:
-              assert 'font-display:swap' in rule
-              css=css.replace(rule,rule.replace('font-display:swap','font-display:optional'))
-          css,n=re.subn(r'--font-portfolio:[^;}]+','--font-portfolio:"Jules Aeonik",Arial,sans-serif',css);assert n==1
-          version=hashlib.sha256((newmodule+css).encode()).hexdigest()[:10]
-          mapping={module.name:f'PortfolioMotion-stable-{version}.js',csspath.name:f'index-stable-{version}.css'}
-          originals={p:p.read_text() for p in root.rglob('*') if p.is_file() and '.git' not in p.parts and '.github' not in p.parts and p.suffix in ['.html','.rsc','.js','.json','.css']}
-          while True:
-              extra={p.name:p.stem+f'-stable-{version}'+p.suffix for p,s in originals.items() if p.suffix=='.js' and p.name not in mapping and any(old in s for old in mapping)}
-              if not extra:break
-              mapping.update(extra)
-          def renamed(s):
-              for old,new in mapping.items():s=s.replace(old,new)
-              return s
-          changed=[]
-          for p,original in originals.items():
-              s=newmodule if p==module else css if p==csspath else original
-              s=renamed(s)
-              if p.suffix=='.html' and '</head>' in s:
-                  links=''.join('<link rel="preload" href="/fonts/'+f+'.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>' for f in ['AeonikPro-Regular','AeonikPro-Bold'])
-                  s=s.replace('</head>',links+'</head>',1)
-              dest=p.with_name(mapping.get(p.name,p.name))
-              if s!=original or dest!=p:
-                  dest.write_text(s);changed.append(str(dest.relative_to(root)))
-          manifest={'version':version,'mapping':mapping,'changed':sorted(changed),'sha256':{p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in changed}}
-          Path(sys.argv[3]).write_text(json.dumps(manifest,indent=2))
-          print('PREPARED',version,len(changed),'files')
-          PY
-          python3 results/patch-site.py site results/preview-helper.js results/deployment-manifest.json
-      - name: Verify all reviewed hashes and preserve page content
-        run: |
-          python3 - <<'PY'
-          import json,hashlib,subprocess,re
-          from pathlib import Path
-          from html.parser import HTMLParser
-          root=Path('site');m=json.loads(Path('results/deployment-manifest.json').read_text())
-          digest=hashlib.sha256(json.dumps(m,sort_keys=True).encode()).hexdigest()
-          assert digest=='1380d0ac27e2e76cf96755fc3b9c2535b3f349c491e2e452b6a417f95529c807',digest
-          assert m['version']=='5ca2444a86' and len(m['changed'])==34
-          class Visible(HTMLParser):
-              def __init__(self):super().__init__();self.skip=0;self.text=[];self.media=[]
-              def handle_starttag(self,tag,attrs):
-                  if tag in ('script','style'):self.skip+=1
-                  if tag in ('img','video'):self.media.append((tag,dict(attrs).get('src'),dict(attrs).get('alt'),dict(attrs).get('poster')))
-              def handle_endtag(self,tag):
-                  if tag in ('script','style'):self.skip-=1
-              def handle_data(self,data):
-                  if not self.skip and data.strip():self.text.append(data.strip())
-          for name in m['changed']:
-              if name.endswith('.html'):
-                  old=subprocess.check_output(['git','-C','site','show','HEAD:'+name],text=True)
-                  a=Visible();a.feed(old);b=Visible();b.feed((root/name).read_text())
-                  assert a.text==b.text,name+' visible text changed'
-                  assert a.media==b.media,name+' media changed'
-          # Any length-prefixed Flight text records must not contain renamed references.
-          for p in root.rglob('*.rsc'):
-              old=subprocess.check_output(['git','-C','site','show','HEAD:'+str(p.relative_to(root))])
-              for match in re.finditer(rb'(?:^|\n)[0-9a-f]+:T([0-9a-f]+),',old):
-                  payload=old[match.end():match.end()+int(match.group(1),16)]
-                  assert not any(key.encode() in payload for key in m['mapping']),str(p)+' length-prefixed text needs rewriting'
-          Path('results/verification.txt').write_text('PASS: exact reviewed manifest, visible text/media preserved, no changed length-prefixed Flight text\n')
-          print('PASS exact reviewed manifest, content preservation, Flight text integrity')
-          PY
-      - name: Check complete page and case-study navigation
-        run: |
-          mkdir tools
+          mkdir tools results
           cd tools
           npm init -y >/dev/null
-          npm install --save-exact playwright-core@1.55.1 >/dev/null
-          export CHROME_PATH="$(command -v google-chrome)"
-          python3 -m http.server 4173 --bind 127.0.0.1 --directory ../site > ../results/server.log 2>&1 &
-          cat > smoke.mjs <<'JS'
-          import {chromium} from 'playwright-core';
-          import assert from 'node:assert/strict';
-          import {writeFile} from 'node:fs/promises';
-          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
-          const results=[];
-          for(const width of [1440,390]) {
-            const page=await browser.newPage({viewport:{width,height:900}});
-            const errors=[];page.on('pageerror',e=>errors.push(e.message));
-            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
-            await page.waitForTimeout(1000);
-            await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(1000);
-            assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
-            assert((await page.locator('#enso video').evaluateAll(v=>v.filter(x=>!x.paused).length))<=1);
-            await page.screenshot({path:`../results/staged-${width}.png`});
-            await page.goto('http://127.0.0.1:4173/work/grok-builders-night.html',{waitUntil:'domcontentloaded'});
-            await page.waitForTimeout(600);assert((await page.locator('h1').innerText()).length>0);
-            const home=page.locator('a[href="/"]').first();await home.click();
-            await page.waitForURL('http://127.0.0.1:4173/');
-            await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(600);
-            assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
-            assert.deepEqual(errors,[]);
-            results.push({width,pass:true,tests:'home, Ensō, one preview, case study, return home, Ensō again'});
-            await page.close();
-          }
-          await browser.close();console.log(JSON.stringify(results));await writeFile('../results/navigation.json',JSON.stringify(results,null,2));
-          JS
-          node smoke.mjs
-      - name: Save exact release branch only
-        working-directory: site
+          npm install --save-exact playwright@1.55.1 >/dev/null
+          npx playwright install --with-deps webkit > ../results/browser-install.log 2>&1
+      - name: Verify actual production bytes and interactions
         run: |
-          test "$(git ls-remote origin refs/heads/gh-pages | cut -f1)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
-          python3 - <<'PY'
-          import subprocess,json
-          m=json.load(open('../results/deployment-manifest.json'))
-          subprocess.run(['git','add','--',*m['changed']],check=True)
-          paths=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
-          assert sorted(paths)==m['changed']
-          PY
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Stage exact tested Ensō font and preview corrections 5ca2444a86'
-          target=refs/heads/release/enso-reviewed-5ca2444a86
-          existing="$(git ls-remote origin "$target" | cut -f1)"
-          if [ -n "$existing" ]; then
-            git fetch origin "$target"
-            test "$(git rev-parse HEAD^{tree})" = "$(git rev-parse FETCH_HEAD^{tree})"
-            echo "$existing" > ../results/release-commit.txt
-          else
-            git push origin "HEAD:$target"
-            git rev-parse HEAD > ../results/release-commit.txt
-          fi
+          export CHROME_PATH="$(command -v google-chrome)"
+          cd tools
+          cat > live.mjs <<'JS'
+          import {chromium,webkit} from 'playwright';
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          const base='https://jules.social/';
+          const expected={
+            '':'7dcce10bc7a9332f956e107c16bf9f48e336fa7e82113bc28376964fb303dd4c',
+            'assets/PortfolioMotion-stable-5ca2444a86.js':'67fea1c2339d9895b4ac0d852eb69a11634d061fbb2f4cb4c2cd55473a8bffe7',
+            'assets/index-stable-5ca2444a86.css':'e31c6328b485bfe9fced564dc7b607c9ddac70d8d4b95faff52e64509c9dccea'
+          };
+          const sha=b=>createHash('sha256').update(b).digest('hex');
+          const delivery=[];
+          for(const [path,digest] of Object.entries(expected)) {
+            const response=await fetch(base+path,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(20000)});
+            assert.equal(response.status,200);
+            const actual=sha(Buffer.from(await response.arrayBuffer()));assert.equal(actual,digest,path);
+            delivery.push({path,status:response.status,sha256:actual});
+          }
+          console.log('LIVE BYTES VERIFIED',JSON.stringify(delivery));
+          const results=[];
+          for(const [engine,driver] of [['chrome',chromium],['webkit',webkit]]) {
+            const browser=await driver.launch(engine==='chrome'?{executablePath:process.env.CHROME_PATH}:{});
+            for(const width of [1440,390]) for(const slow of [false,true]) {
+              const context=await browser.newContext({viewport:{width,height:900}});
+              if(slow) await context.route(/\.woff2?(\?|$)/,async route=>{await new Promise(r=>setTimeout(r,2500));await route.continue().catch(()=>{});});
+              await context.addInitScript(()=>{
+                window.__ready=false;window.__headingReveals=0;
+                const add=EventTarget.prototype.addEventListener;
+                EventTarget.prototype.addEventListener=function(...args){if(this instanceof HTMLElement&&this.tagName==='MAIN'&&args[0]==='click')window.__ready=true;return add.apply(this,args)};
+                const animate=Element.prototype.animate;
+                Element.prototype.animate=function(...args){if(this.id==='merch-heading')window.__headingReveals++;return animate.apply(this,args)};
+              });
+              const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              try {
+                const modulePromise=page.waitForResponse(r=>r.url()===base+'assets/PortfolioMotion-stable-5ca2444a86.js');
+                await page.goto(base,{waitUntil:'domcontentloaded'});await page.bringToFront();
+                const module=await modulePromise;assert.equal(sha(await module.body()),expected['assets/PortfolioMotion-stable-5ca2444a86.js']);
+                await page.waitForFunction(()=>window.__ready);
+                await page.locator('nav a[href="#enso"]').click();
+                const frames=await page.evaluate(()=>new Promise(resolve=>{
+                  const start=performance.now(),samples=[];
+                  function sample(){const h=document.getElementById('merch-heading');samples.push({t:performance.now()-start,y:scrollY,doc:document.documentElement.scrollHeight,top:h.getBoundingClientRect().top,clip:getComputedStyle(h).clipPath,playing:[...document.querySelectorAll('#enso video')].filter(v=>!v.paused).length});if(performance.now()-start<3300)setTimeout(sample,50);else resolve(samples)}sample();
+                }));
+                const measured=frames.filter(f=>f.t>150),last=frames.at(-1);
+                assert(measured.length>10);assert(measured.every(f=>f.playing<=1));assert(last.top>0&&last.top<900);assert.equal(last.clip,'none');
+                assert.equal(await page.evaluate(()=>window.__headingReveals),0);
+                const heightRange=Math.max(...measured.map(f=>f.doc))-Math.min(...measured.map(f=>f.doc));
+                const scrollRange=Math.max(...measured.map(f=>f.y))-Math.min(...measured.map(f=>f.y));
+                if(slow){assert(heightRange<=1,'Late document-height shift');assert(scrollRange<=1,'Late scroll jump');}
+                await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+                await page.locator('nav a[href="#enso"]').focus();await page.keyboard.press('Enter');await page.waitForTimeout(500);
+                assert.equal(new URL(page.url()).hash,'#enso');assert.equal(await page.evaluate(()=>window.__headingReveals),0);
+                if(!slow) {
+                  const second=page.locator('#enso video').nth(1),button=second.locator('..');
+                  await second.scrollIntoViewIfNeeded();await page.waitForTimeout(400);
+                  if(await second.evaluate(v=>!v.paused)){await button.click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);}
+                  await button.click();await page.waitForFunction(()=>{const v=document.querySelectorAll('#enso video')[1];return !v.paused&&v.currentTime>0.1});
+                  assert.equal(await page.locator('#enso video').evaluateAll(vs=>vs.filter(v=>!v.paused).length),1);
+                  await button.click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);
+                  await page.screenshot({path:`../results/live-${engine}-${width}.png`});
+                }
+                assert.deepEqual(errors,[]);results.push({engine,width,slowFonts:slow,pass:true,heightRange,scrollRange,last});
+              } catch(error) { results.push({engine,width,slowFonts:slow,pass:false,error:error.message,errors}); }
+              console.log('LIVE RESULT',JSON.stringify(results.at(-1)));await context.close();
+            }
+            await browser.close();
+          }
+          await writeFile('../results/live-results.json',JSON.stringify({version:'5ca2444a86',delivery,results},null,2));
+          if(results.some(r=>!r.pass))process.exitCode=1;
+          JS
+          cp live.mjs ../results/live.mjs
+          node live.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: enso-exact-release-5ca2444a86
+          name: enso-exact-live-5ca2444a86
           path: results/
           retention-days: 3
