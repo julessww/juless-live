@@ -1,0 +1,81 @@
+name: Confirm live Ensō stability correction
+on:
+  push:
+    branches: [verify/enso-exact-5ca2444a86]
+    paths: [.github/workflows/enso-live-confirm-c4f117e2.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify real production bytes and navigation
+        run: |
+          npm init -y >/dev/null
+          npm install --save-exact playwright-core@1.55.1 >/dev/null
+          mkdir results
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > live.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import {createHash} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          import assert from 'node:assert/strict';
+          const base='https://jules.social';
+          const expected={
+            '/assets/PortfolioMotion-stable-5ca2444a86.js':'67fea1c2339d9895b4ac0d852eb69a11634d061fbb2f4cb4c2cd55473a8bffe7',
+            '/assets/index-stable-5ca2444a86.css':'e31c6328b485bfe9fced564dc7b607c9ddac70d8d4b95faff52e64509c9dccea'
+          };
+          const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+          for(const [path,hash] of Object.entries(expected)){
+            const r=await fetch(base+path);assert.equal(r.status,200);assert.equal(sha(Buffer.from(await r.arrayBuffer())),hash);console.log('VERIFIED LIVE ASSET',path);
+          }
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+          const results=[];
+          for(const width of [1440,390]) for(const delayedFonts of [false,true]) {
+            const context=await browser.newContext({viewport:{width,height:900}});
+            if(delayedFonts)await context.route('**/fonts/*.woff2',async route=>{await new Promise(r=>setTimeout(r,2500));await route.continue();});
+            await context.addInitScript(()=>{
+              window.__ready=false;window.__headingReveals=0;
+              const add=EventTarget.prototype.addEventListener;
+              EventTarget.prototype.addEventListener=function(...args){if(this instanceof HTMLElement&&this.tagName==='MAIN'&&args[0]==='click')window.__ready=true;return add.apply(this,args);};
+              const animate=Element.prototype.animate;
+              Element.prototype.animate=function(...args){if(this.id==='merch-heading')window.__headingReveals++;return animate.apply(this,args);};
+            });
+            const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            try{
+              const moduleResponse=page.waitForResponse(r=>r.url()===base+Object.keys(expected)[0]);
+              const response=await page.goto(base+'/',{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);
+              const module=await moduleResponse;assert.equal(sha(await module.body()),Object.values(expected)[0]);
+              await page.waitForFunction(()=>window.__ready);
+              await page.evaluate(()=>{window.__frames=[];const start=performance.now();function sample(t){window.__frames.push({t:t-start,y:scrollY,height:document.documentElement.scrollHeight,playing:[...document.querySelectorAll('#enso video')].filter(v=>!v.paused).length});if(t-start<4000)requestAnimationFrame(sample);}requestAnimationFrame(sample);});
+              await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(4200);
+              const frames=await page.evaluate(()=>window.__frames);const settled=frames.filter(f=>f.t>1000);
+              assert(Math.max(...settled.map(f=>f.height))-Math.min(...settled.map(f=>f.height))<=1,'Late document-height shift');
+              assert(Math.max(...settled.map(f=>f.y))-Math.min(...settled.map(f=>f.y))<=1,'Late scroll shift');
+              assert(Math.max(...frames.map(f=>f.playing))<=1,'Multiple playing previews');
+              const state=await page.locator('#merch-heading').evaluate(h=>({top:h.getBoundingClientRect().top,clip:getComputedStyle(h).clipPath,reveals:window.__headingReveals}));
+              assert.equal(state.clip,'none');assert.equal(state.reveals,0);assert(state.top>=0&&state.top<900);
+              await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+              await page.locator('nav a[href="#enso"]').focus();await page.keyboard.press('Enter');await page.waitForTimeout(500);
+              assert.equal(new URL(page.url()).hash,'#enso');assert.equal(await page.evaluate(()=>window.__headingReveals),0);assert.deepEqual(errors,[]);
+              const diffs=frames.slice(1).map((f,i)=>f.t-frames[i].t).sort((a,b)=>a-b);
+              results.push({width,delayedFonts,pass:true,state,medianFrameMs:diffs[Math.floor(diffs.length/2)],errors});
+              console.log('LIVE PASS',JSON.stringify(results.at(-1)));
+              await page.screenshot({path:`results/live-${width}-${delayedFonts}.png`});
+            }catch(e){results.push({width,delayedFonts,pass:false,error:e.message,errors});console.log('LIVE FAIL',JSON.stringify(results.at(-1)));}
+            await context.close();
+          }
+          await browser.close();await writeFile('results/live.json',JSON.stringify({expected,results},null,2));
+          if(results.some(r=>!r.pass))process.exitCode=1;
+          JS
+          node live.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-stability-live-confirmation
+          path: results/
+          retention-days: 3
