@@ -1,0 +1,138 @@
+name: Ensō final integration comparison
+on:
+  push:
+    branches: [verify/enso-exact-5ca2444a86]
+    paths: [.github/workflows/enso-candidate-integration.yml]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: a00dd621b1f9a111e794460e2ce88115067679e7
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify payloads and preserved content
+        run: |
+          mkdir results
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,json,hashlib
+          from html.parser import HTMLParser
+          old=Path('baseline');new=Path('candidate')
+          mapping={'PortfolioMotion-BY701fA3.js':'PortfolioMotion-stable-5ca2444a86.js','index-BAkL0943.css':'index-stable-5ca2444a86.css','index-C0w-mBvX.js':'index-C0w-mBvX-stable-5ca2444a86.js','router-uNmIePHS.js':'router-uNmIePHS-stable-5ca2444a86.js','layout-segment-context-Dl5WnURY.js':'layout-segment-context-Dl5WnURY-stable-5ca2444a86.js','link-Dm2rhvBB.js':'link-Dm2rhvBB-stable-5ca2444a86.js','MotionConcept-edmeiVAR.js':'MotionConcept-edmeiVAR-stable-5ca2444a86.js'}
+          assert hashlib.sha256((new/'assets/PortfolioMotion-stable-5ca2444a86.js').read_bytes()).hexdigest()=='67fea1c2339d9895b4ac0d852eb69a11634d061fbb2f4cb4c2cd55473a8bffe7'
+          class Visible(HTMLParser):
+              def __init__(self):super().__init__();self.skip=0;self.text=[];self.media=[]
+              def handle_starttag(self,t,attrs):
+                  if t in ('script','style'):self.skip+=1
+                  if t in ('img','video'):self.media.append((t,dict(attrs).get('src'),dict(attrs).get('alt'),dict(attrs).get('poster')))
+              def handle_endtag(self,t):
+                  if t in ('script','style'):self.skip-=1
+              def handle_data(self,s):
+                  if not self.skip and s.strip():self.text.append(s.strip())
+          checked=[]
+          for p in old.rglob('*'):
+              if '.git' in p.parts or p.suffix not in ('.html','.rsc'):continue
+              q=new/p.relative_to(old)
+              if p.suffix=='.html':
+                  a=Visible();a.feed(p.read_text());b=Visible();b.feed(q.read_text())
+                  assert a.text==b.text and a.media==b.media,str(p)+' text/media differs'
+              else:
+                  raw=p.read_bytes()
+                  for m in re.finditer(rb'(?:^|\n)[0-9a-f]+:T([0-9a-f]+),',raw):
+                      payload=raw[m.end():m.end()+int(m.group(1),16)]
+                      assert not any(k.encode() in payload for k in mapping),str(p)+' length-prefixed record affected'
+                  restored=q.read_text()
+                  for k,v in mapping.items():restored=restored.replace(v,k)
+                  assert restored==p.read_text(),str(p)+' unexpected Flight payload change'
+              checked.append(str(p.relative_to(old)))
+          Path('results/content-check.json').write_text(json.dumps({'pass':True,'paths':checked},indent=2))
+          print('PASS content/media preservation and Flight text integrity',len(checked))
+          PY
+      - name: Compare actual visible interactions
+        run: |
+          mkdir tools
+          cd tools
+          npm init -y >/dev/null
+          npm install --save-exact playwright-core@1.55.1 >/dev/null
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > server.py <<'PY'
+          from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
+          from pathlib import Path
+          from urllib.parse import urlsplit,unquote
+          import sys
+          root=Path(sys.argv[1]).resolve()
+          class Handler(SimpleHTTPRequestHandler):
+              def translate_path(self,path):
+                  rel=unquote(urlsplit(path).path).lstrip('/')
+                  p=root/rel
+                  if p.is_file() or p.is_dir():return str(p)
+                  if rel=='.rsc':return str(root/'index.rsc')
+                  if (root/(rel+'.html')).is_file():return str(root/(rel+'.html'))
+                  return str(p)
+          ThreadingHTTPServer(('127.0.0.1',int(sys.argv[2])),Handler).serve_forever()
+          PY
+          python3 server.py ../baseline 4173 > ../results/baseline-server.log 2>&1 &
+          python3 server.py ../candidate 4174 > ../results/candidate-server.log 2>&1 &
+          cat > check.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+          const results=[];
+          for(const [name,port] of [['baseline',4173],['candidate',4174]]) for(const width of [1440,390]) {
+            const context=await browser.newContext({viewport:{width,height:900}});
+            const page=await context.newPage();page.setDefaultTimeout(10000);
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            const base=`http://127.0.0.1:${port}`;
+            const check=async(test,fn)=>{try{await fn();results.push({name,width,test,pass:true});console.log('PASS',name,width,test);}catch(e){results.push({name,width,test,pass:false,error:e.message,errors:[...errors]});console.log('FAIL',name,width,test,e.message);}};
+            await page.goto(base+'/',{waitUntil:'domcontentloaded'});await page.waitForTimeout(1200);
+            await check('Ensō navigation and playback',async()=>{
+              await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(1200);
+              assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
+              if(name==='candidate')assert(await page.locator('#enso video').evaluateAll(v=>v.filter(x=>!x.paused).length)<=1);
+              const card=page.locator('#enso button').nth(1);await card.scrollIntoViewIfNeeded();await page.waitForTimeout(300);
+              const video=card.locator('video');if(await video.evaluate(v=>!v.paused))await card.click();
+              await card.click();await page.waitForFunction(()=>!document.querySelectorAll('#enso video')[1].paused);
+              if(name==='candidate')assert.equal(await page.locator('#enso video').evaluateAll(v=>v.filter(x=>!x.paused).length),1);
+              await card.click();assert(await video.evaluate(v=>v.paused));
+            });
+            await check('visible gallery modal and close',async()=>{
+              const card=page.locator('#enso button').last();await card.scrollIntoViewIfNeeded();await page.waitForTimeout(400);
+              await card.click();await page.waitForFunction(()=>document.querySelector('dialog')?.open);
+              assert((await page.locator('#expanded-project-title').innerText()).includes('Crowdmuse'));
+              await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('dialog')?.open);
+            });
+            await check('case study and client return home',async()=>{
+              await page.goto(base+'/work/grok-builders-night',{waitUntil:'domcontentloaded'});await page.waitForTimeout(500);
+              assert((await page.locator('h1').innerText()).length>0);
+              await page.locator('a[href="/"]').first().click();await page.waitForURL(base+'/');
+              await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(1000);
+              assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
+              await page.screenshot({path:`../results/${name}-${width}.png`});
+            });
+            results.push({name,width,test:'no JavaScript page errors',pass:errors.length===0,errors});
+            await context.close();
+          }
+          await browser.close();await writeFile('../results/integration.json',JSON.stringify(results,null,2));
+          if(results.some(r=>r.name==='candidate'&&!r.pass))process.exitCode=1;
+          JS
+          node check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-final-integration
+          path: results/
+          retention-days: 3
