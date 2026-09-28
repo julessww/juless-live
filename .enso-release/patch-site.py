@@ -14,7 +14,13 @@ for rule in rules:
   assert 'font-display:swap' in rule
   css=css.replace(rule,rule.replace('font-display:swap','font-display:optional'))
 css,n=re.subn(r'--font-portfolio:[^;}]+','--font-portfolio:"Jules Aeonik",Arial,sans-serif',css);assert n==1
-version=hashlib.sha256((module+css).encode()).hexdigest()[:10]
+preview=json.loads(Path(sys.argv[4]).read_text())
+previewpath=site/preview['path']
+previewtext=previewpath.read_text()
+assert hashlib.sha256(previewtext.encode()).hexdigest()==preview['beforeSha256']
+assert previewtext.count(preview['original'])==1
+previewtext=previewtext.replace(preview['original'],preview['replacement'])
+version=hashlib.sha256((module+css+previewtext).encode()).hexdigest()[:10]
 mapping={oldjs:f'ScrollMotion-stable-{version}.js',csspath.name:f'index-stable-{version}.css'}
 originals={p:p.read_text() for p in site.rglob('*') if p.is_file() and '.git' not in p.parts and p.suffix in ['.html','.rsc','.js','.json','.css']}
 # Rename JS importers too: existing cached modules must not keep importing the old code.
@@ -26,6 +32,7 @@ changed=[]
 for p,s in originals.items():
   if p.name==oldjs:s=module
   elif p==csspath:s=css
+  elif p==previewpath:s=previewtext
   for old,new in mapping.items():s=s.replace(old,new)
   if p.suffix=='.html' and '</head>' in s:
     links=''.join(f'<link rel="preload" href="/fonts/{name}.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>' for name in ['AeonikPro-Regular','AeonikPro-Bold'])
