@@ -8,7 +8,7 @@ permissions:
 jobs:
   stage:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,15 +18,18 @@ jobs:
         with:
           ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
           path: site
-      - name: Reproduce reviewed deployment changes
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reproduce exact reviewed candidate
         run: |
           mkdir results
           echo 'ff702f4ed99653307945aff489581c369d91aa322db2f295d010ff93ce22f3be  payload/.enso-release/ScrollMotion.js' | sha256sum -c -
-          python3 payload/.enso-release/patch-site.py site payload/.enso-release/ScrollMotion.js results/deployment-manifest.json
+          python3 payload/.enso-release/patch-site.py site payload/.enso-release/ScrollMotion.js results/deployment-manifest.json payload/.enso-release/preview-replacement.json
           python3 - <<'PY'
           from pathlib import Path
           from html.parser import HTMLParser
-          import json,subprocess,hashlib
+          import json,subprocess,hashlib,re
           class Visible(HTMLParser):
             def __init__(self):super().__init__();self.skip=0;self.text=[];self.media=[]
             def handle_starttag(self,tag,attrs):
@@ -37,22 +40,84 @@ jobs:
             def handle_data(self,data):
               if not self.skip and data.strip():self.text.append(data.strip())
           site=Path('site');manifest=json.loads(Path('results/deployment-manifest.json').read_text())
+          digest=hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest()
+          assert digest=='58abc8ab57fc06485e2543fa82ad8f6bf77b7805dffe8e9ff2c78af021953691',digest
           for name in manifest['changed']:
             assert not name.startswith('/') and '..' not in Path(name).parts
-            if not name.endswith('.html'):continue
+            if not name.endswith(('.html','.rsc')):continue
             old=subprocess.check_output(['git','-C','site','show','HEAD:'+name],text=True)
-            before=Visible();before.feed(old);after=Visible();after.feed((site/name).read_text())
-            assert before.text==after.text,name+' visible copy changed'
-            assert before.media==after.media,name+' media changed'
-          Path('results/manifest-digest.txt').write_text(hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest())
-          print('Visible copy and media references preserved in every HTML page')
+            new=(site/name).read_text()
+            if name.endswith('.html'):
+              before=Visible();before.feed(old);after=Visible();after.feed(new)
+              assert before.text==after.text,name+' visible copy changed'
+              assert before.media==after.media,name+' media changed'
+            else:
+              # Asset rewrites must not alter any byte-counted Flight string record.
+              raw=old.encode();i=0
+              while i<len(raw):
+                colon=raw.find(b':',i)
+                assert colon>=i,(name,i)
+                assert re.fullmatch(rb'[0-9a-f]*',raw[i:colon]),(name,i)
+                start=colon+1
+                if raw[start:start+1]==b'T':
+                  comma=raw.index(b',',start);length=int(raw[start+1:comma],16)
+                  text=raw[comma+1:comma+1+length]
+                  assert not any(k.encode() in text for k in manifest['mapping']),name+' needs Flight length adjustment'
+                  i=comma+1+length
+                else:
+                  end=raw.find(b'\n',start);i=len(raw) if end<0 else end+1
+          Path('results/manifest-digest.txt').write_text(digest)
+          print('Exact candidate, visible copy, media and Flight string lengths verified')
           PY
-      - name: Commit only deployment files to a new staging branch
+      - name: Test page navigation and preview controls on staged snapshot
+        run: |
+          mkdir tools
+          cd tools
+          npm init -y >/dev/null
+          npm install --save-exact playwright-core@1.55.1 >/dev/null
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > serve.py <<'PY'
+          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          import os
+          os.chdir('../site')
+          class Handler(SimpleHTTPRequestHandler):
+            def do_GET(self):
+              path=urlsplit(self.path).path
+              if path=='/.rsc':self.path='/index.rsc'
+              elif not Path('.'+path).exists() and Path('.'+path+'.html').exists():self.path=path+'.html'
+              super().do_GET()
+          ThreadingHTTPServer(('127.0.0.1',4173),Handler).serve_forever()
+          PY
+          python3 serve.py > ../results/server.log 2>&1 &
+          cat > check.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});const results=[];
+          for(const width of [1440,390]){
+            const context=await browser.newContext({viewport:{width,height:900}});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.evaluate(()=>document.fonts.ready);await page.bringToFront();await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+            await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(1000);
+            assert.equal(await page.locator('#enso video').evaluateAll(vs=>vs.filter(v=>!v.paused).length),0);
+            const v=page.locator('#enso video').nth(1);await v.scrollIntoViewIfNeeded();await v.locator('..').click();await page.waitForFunction(()=>{const v=document.querySelectorAll('#enso video')[1];return !v.paused&&v.currentTime>0&&v.parentElement.getAttribute('aria-label').startsWith('Pause ')});
+            await v.locator('..').click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);
+            for(const slug of ['grok-builders-night','zerion-supper-club-london']){
+              await page.goto('http://127.0.0.1:4173/work/'+slug,{waitUntil:'domcontentloaded'});await page.locator('h1').waitFor();assert((await page.locator('h1').innerText()).length>3);await page.waitForTimeout(300);
+              const home=page.locator('a[href="/"]').first();await home.click();await page.locator('#merch-heading').waitFor({state:'attached'});await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(500);assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
+            }
+            assert.deepEqual(errors,[]);results.push({width,previewControls:true,caseStudyRoundTrips:2,errors});await page.screenshot({path:`../results/staged-${width}.png`});await context.close();
+          }
+          await browser.close();console.log(JSON.stringify(results));await writeFile('../results/routes.json',JSON.stringify(results,null,2));
+          JS
+          node check.mjs
+      - name: Commit deployment files to a new release branch only
         working-directory: site
         run: |
           test "$(git ls-remote origin refs/heads/gh-pages | cut -f1)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
-          test -z "$(git ls-remote origin refs/heads/fix/enso-stability-release)"
-          git switch -c fix/enso-stability-release
+          test -z "$(git ls-remote origin refs/heads/release/enso-stability-final)"
+          git switch -c release/enso-stability-final
           python3 - <<'PY'
           import json,subprocess
           files=json.load(open('../results/deployment-manifest.json'))['changed']
@@ -60,13 +125,13 @@ jobs:
           actual=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
           assert sorted(actual)==sorted(files)
           PY
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Stage cache-versioned font and Ensō playback stability changes'
-          git push origin HEAD:refs/heads/fix/enso-stability-release
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Stabilize font loading and make Ensō previews click-to-play'
+          git push origin HEAD:refs/heads/release/enso-stability-final
           git rev-parse HEAD > ../results/deployment-commit.txt
           git diff --stat HEAD^ HEAD > ../results/deployment-stat.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: enso-staged-deployment
+          name: enso-staged-final
           path: results/
           retention-days: 3
