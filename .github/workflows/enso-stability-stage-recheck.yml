@@ -12,78 +12,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 4
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Extract fixed release recipe
+      - name: Fetch pinned baseline and review recipes
         run: |
+          git fetch --depth=1 origin 53b61f1ccb1cce6f6fb7d78a3997408387d47de4 7e901f8a0d4633dc05219a690530f32f91a548e7 e61fae0201f0f7ac330c99034aa64d91b608b0cf
+          git cat-file -e 53b61f1ccb1cce6f6fb7d78a3997408387d47de4^{tree}
           python3 - <<'PY'
           import subprocess
           from pathlib import Path
-          lines=subprocess.check_output(['git','show','7e901f8a0d4633dc05219a690530f32f91a548e7:.github/workflows/enso-stability-stage.yml']).decode().splitlines()
-          names=['Prepare checked source-equivalent assets','Verify routes, playback, and interactions','Commit staged assets only, without publishing']
-          for index,name in enumerate(names):
-              start=lines.index('      - name: '+name)+2;out=[]
-              for line in lines[start:]:
+          raw=subprocess.check_output(['git','show','e61fae0201f0f7ac330c99034aa64d91b608b0cf:.github/workflows/enso-stability-stage-recheck.yml']).decode().splitlines()
+          names=['Extract fixed release recipe','Assert byte-equivalence to 20 passing browser scenarios','Compare existing image interaction with the baseline']
+          for i,name in enumerate(names):
+              start=raw.index('      - name: '+name)+2;out=[]
+              for line in raw[start:]:
                   if line and not line.startswith('          '):break
                   out.append(line[10:] if line else '')
-              text='\n'.join(out)+'\n';assert text.strip()
-              if index==0:
-                  old='test "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD^)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4'
-                  assert text.count(old)==1
-                  text=text.replace(old,'test -z "$(git -C "$GITHUB_WORKSPACE" diff --name-only 53b61f1ccb1cce6f6fb7d78a3997408387d47de4 HEAD -- . \':(exclude).github\')"')
-              if index==1:
-                  old="await page.locator('#enso button').last().click();await page.locator('dialog[open]').waitFor();await page.keyboard.press('Escape');await page.waitForTimeout(500);assert.equal(await page.locator('dialog[open]').count(),0);"
-                  assert text.count(old)==1
-                  text=text.replace(old,"console.log('BUTTONS',width,await page.locator('#enso button').evaluateAll(bs=>bs.map(b=>({label:b.getAttribute('aria-label'),image:!!b.querySelector('img'),video:!!b.querySelector('video')}))));")
-                  text=text.replace('imageModal:true','imageModal:"checked separately against baseline"')
-              if index==2:
-                  text=text.replace('git rm .github/workflows/enso-stability-stage.yml','git rm .github/workflows/enso-stability-stage.yml .github/workflows/enso-stability-stage-recheck.yml')
-              Path('/tmp/enso-step-'+str(index)+'.sh').write_text(text)
+              assert out
+              Path('/tmp/review-'+str(i)+'.sh').write_text('\n'.join(out)+'\n')
           PY
+      - name: Extract fixed release recipe
+        run: bash -e /tmp/review-0.sh
       - name: Prepare identical versioned release
         run: bash -e /tmp/enso-step-0.sh
-      - name: Assert byte-equivalence to 20 passing browser scenarios
-        run: |
-          python3 - <<'PY'
-          import json,hashlib
-          manifest=json.load(open('/tmp/enso-release/results/deployment-manifest.json'))
-          digest=hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest()
-          assert digest=='1380d0ac27e2e76cf96755fc3b9c2535b3f349c491e2e452b6a417f95529c807',digest
-          print('Exact file list and all asset SHA256 values match successful source review run 36472427447')
-          PY
+      - name: Assert exact reviewed artifact
+        run: bash -e /tmp/review-1.sh
       - name: Verify playback and case-study routes
         run: bash -e /tmp/enso-step-1.sh
-      - name: Compare existing image interaction with the baseline
-        run: |
-          mkdir /tmp/enso-baseline
-          git archive 53b61f1ccb1cce6f6fb7d78a3997408387d47de4 | tar -x -C /tmp/enso-baseline
-          python3 -m http.server 4174 --bind 127.0.0.1 --directory /tmp/enso-baseline > /tmp/enso-release/results/baseline-server.log 2>&1 &
-          cd /tmp/enso-release
-          export CHROME_PATH="$(command -v google-chrome)"
-          cat > modal.mjs <<'JS'
-          import {chromium} from 'playwright-core';
-          import assert from 'node:assert/strict';
-          import {writeFile} from 'node:fs/promises';
-          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
-          const results=[];
-          for(const width of [1440,390])for(const [version,port] of [['baseline',4174],['candidate',4173]]){
-            const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();page.setDefaultTimeout(8000);
-            const errors=[];page.on('pageerror',e=>errors.push(e.message));
-            await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded'});await page.waitForTimeout(1200);
-            const button=page.locator('#enso button').filter({has:page.locator('img')}).last();
-            const labels=await page.locator('#enso button').evaluateAll(bs=>bs.map(b=>({label:b.getAttribute('aria-label'),image:!!b.querySelector('img'),video:!!b.querySelector('video')})));
-            const before=page.url();let open=false,closed=false,activationError=null;
-            try{await button.press('Enter');await page.waitForFunction(()=>[...document.querySelectorAll('dialog')].some(d=>d.open),null,{timeout:5000});open=true;await page.keyboard.press('Escape');await page.waitForTimeout(700);closed=await page.locator('dialog[open]').count()===0;}catch(e){activationError=e.message;}
-            const dialogs=await page.locator('dialog').evaluateAll(ds=>ds.map(d=>({open:d.open,text:d.innerText.slice(0,150),rect:d.getBoundingClientRect().toJSON()})));
-            const result={version,width,labels,before,url:page.url(),open,closed,activationError,dialogs,errors};results.push(result);console.log('MODAL COMPARISON',JSON.stringify(result));
-            await page.screenshot({path:`results/modal-${version}-${width}.png`});await context.close();
-          }
-          await browser.close();await writeFile('results/modal-comparison.json',JSON.stringify(results,null,2));
-          for(const width of [1440,390]){const a=results.find(r=>r.width===width&&r.version==='baseline'),b=results.find(r=>r.width===width&&r.version==='candidate');assert.equal(b.open,a.open,'Image modal regressed');assert.equal(b.closed,a.closed,'Image modal closing regressed');assert.deepEqual(b.errors,a.errors,'New errors');}
-          JS
-          node modal.mjs
+      - name: Compare image-modal behavior with baseline
+        run: bash -e /tmp/review-2.sh
       - name: Commit staged assets only
         run: bash -e /tmp/enso-step-2.sh
       - uses: actions/upload-artifact@v4
