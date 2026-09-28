@@ -1,0 +1,54 @@
+name: Stage Ensō scroll stability
+on:
+  push:
+    branches: [verify/enso-stability-stage]
+    paths: [.github/workflows/enso-stability-stage.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: definition
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          path: site
+      - name: Produce versioned static counterpart
+        run: |
+          mkdir results
+          echo 'ff702f4ed99653307945aff489581c369d91aa322db2f295d010ff93ce22f3be  definition/.enso-release/ScrollMotion.js' | sha256sum -c -
+          python3 definition/.enso-release/patch-site.py site definition/.enso-release/ScrollMotion.js results/deployment-manifest.json definition/.enso-release/preview-replacement.json
+          python3 - <<'PY'
+          import json,hashlib,subprocess
+          from pathlib import Path
+          m=json.loads(Path('results/deployment-manifest.json').read_text())
+          assert len(m['changed'])==35
+          assert all(not p.startswith('.') for p in m['changed'])
+          for p,h in m['sha256'].items():
+            assert hashlib.sha256((Path('site')/p).read_bytes()).hexdigest()==h
+          subprocess.run(['git','-C','site','add','--',*m['changed']],check=True)
+          staged=subprocess.check_output(['git','-C','site','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(staged)==m['changed']
+          print('MANIFEST SHA256',hashlib.sha256(Path('results/deployment-manifest.json').read_bytes()).hexdigest())
+          PY
+      - name: Create reviewed-only staging branch
+        working-directory: site
+        run: |
+          test "$(git ls-remote origin refs/heads/gh-pages | cut -f1)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          test -z "$(git ls-remote origin refs/heads/fix/enso-scroll-stability-deploy)"
+          git switch -c fix/enso-scroll-stability-deploy
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Stabilize fonts and load Ensō videos only after a play click'
+          git push origin HEAD:refs/heads/fix/enso-scroll-stability-deploy
+          git rev-parse HEAD > ../results/deploy-commit.txt
+          git diff --stat HEAD^ HEAD > ../results/changes.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-staged-release
+          path: results/
+          retention-days: 3
