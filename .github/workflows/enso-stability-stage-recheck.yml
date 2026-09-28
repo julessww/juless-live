@@ -1,0 +1,65 @@
+name: Verify staged Ensō stability release
+on:
+  push:
+    branches: [release/enso-stability-20260928]
+    paths: [.github/workflows/enso-stability-stage-recheck.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract fixed release recipe
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          lines=subprocess.check_output(['git','show','7e901f8a0d4633dc05219a690530f32f91a548e7:.github/workflows/enso-stability-stage.yml']).decode().splitlines()
+          names=['Prepare checked source-equivalent assets','Verify routes, playback, and interactions','Commit staged assets only, without publishing']
+          for index,name in enumerate(names):
+              start=lines.index('      - name: '+name)+2;out=[]
+              for line in lines[start:]:
+                  if line and not line.startswith('          '):break
+                  out.append(line[10:] if line else '')
+              text='\n'.join(out)+'\n';assert text.strip()
+              if index==0:
+                  old='test "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD^)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4'
+                  assert text.count(old)==1
+                  text=text.replace(old,'test -z "$(git -C "$GITHUB_WORKSPACE" diff --name-only 53b61f1ccb1cce6f6fb7d78a3997408387d47de4 HEAD -- . \':(exclude).github\')"')
+              if index==1:
+                  old="await page.locator('#enso button').last().click();"
+                  assert text.count(old)==1
+                  text=text.replace(old,"await page.locator('#enso button').last().focus();await page.keyboard.press('Enter');")
+                  text=text.replace('imageModal:true','keyboardImageModal:true')
+              if index==2:
+                  text=text.replace('git rm .github/workflows/enso-stability-stage.yml','git rm .github/workflows/enso-stability-stage.yml .github/workflows/enso-stability-stage-recheck.yml')
+              Path('/tmp/enso-step-'+str(index)+'.sh').write_text(text)
+          PY
+      - name: Prepare identical versioned release
+        run: bash -e /tmp/enso-step-0.sh
+      - name: Assert byte-equivalence to 20 passing browser scenarios
+        run: |
+          python3 - <<'PY'
+          import json,hashlib
+          manifest=json.load(open('/tmp/enso-release/results/deployment-manifest.json'))
+          digest=hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest()
+          assert digest=='1380d0ac27e2e76cf96755fc3b9c2535b3f349c491e2e452b6a417f95529c807',digest
+          print('Exact file list and all asset SHA256 values match successful source review run 36472427447')
+          PY
+      - name: Verify playback, keyboard image modal, and case-study routes
+        run: bash -e /tmp/enso-step-1.sh
+      - name: Commit staged assets only
+        run: bash -e /tmp/enso-step-2.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-staged-final
+          path: /tmp/enso-release/results/
+          retention-days: 3
