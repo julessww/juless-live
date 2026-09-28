@@ -1,0 +1,72 @@
+name: Stage Ensō stability release
+on:
+  push:
+    branches: [verify/enso-stability-publish]
+    paths: [.github/workflows/enso-stability-stage.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: payload
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          path: site
+      - name: Reproduce reviewed deployment changes
+        run: |
+          mkdir results
+          echo 'ff702f4ed99653307945aff489581c369d91aa322db2f295d010ff93ce22f3be  payload/.enso-release/ScrollMotion.js' | sha256sum -c -
+          python3 payload/.enso-release/patch-site.py site payload/.enso-release/ScrollMotion.js results/deployment-manifest.json
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import json,subprocess,hashlib
+          class Visible(HTMLParser):
+            def __init__(self):super().__init__();self.skip=0;self.text=[];self.media=[]
+            def handle_starttag(self,tag,attrs):
+              if tag in ('script','style'):self.skip+=1
+              if tag in ('img','video'):self.media.append((tag,dict(attrs).get('src'),dict(attrs).get('alt'),dict(attrs).get('poster')))
+            def handle_endtag(self,tag):
+              if tag in ('script','style'):self.skip-=1
+            def handle_data(self,data):
+              if not self.skip and data.strip():self.text.append(data.strip())
+          site=Path('site');manifest=json.loads(Path('results/deployment-manifest.json').read_text())
+          for name in manifest['changed']:
+            assert not name.startswith('/') and '..' not in Path(name).parts
+            if not name.endswith('.html'):continue
+            old=subprocess.check_output(['git','-C','site','show','HEAD:'+name],text=True)
+            before=Visible();before.feed(old);after=Visible();after.feed((site/name).read_text())
+            assert before.text==after.text,name+' visible copy changed'
+            assert before.media==after.media,name+' media changed'
+          Path('results/manifest-digest.txt').write_text(hashlib.sha256(json.dumps(manifest,sort_keys=True).encode()).hexdigest())
+          print('Visible copy and media references preserved in every HTML page')
+          PY
+      - name: Commit only deployment files to a new staging branch
+        working-directory: site
+        run: |
+          test "$(git ls-remote origin refs/heads/gh-pages | cut -f1)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          test -z "$(git ls-remote origin refs/heads/fix/enso-stability-release)"
+          git switch -c fix/enso-stability-release
+          python3 - <<'PY'
+          import json,subprocess
+          files=json.load(open('../results/deployment-manifest.json'))['changed']
+          subprocess.run(['git','add','--',*files],check=True)
+          actual=subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert sorted(actual)==sorted(files)
+          PY
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Stage cache-versioned font and Ensō playback stability changes'
+          git push origin HEAD:refs/heads/fix/enso-stability-release
+          git rev-parse HEAD > ../results/deployment-commit.txt
+          git diff --stat HEAD^ HEAD > ../results/deployment-stat.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-staged-deployment
+          path: results/
+          retention-days: 3
