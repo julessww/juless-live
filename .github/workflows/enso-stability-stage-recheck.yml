@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 3
+          fetch-depth: 4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -34,10 +34,10 @@ jobs:
                   assert text.count(old)==1
                   text=text.replace(old,'test -z "$(git -C "$GITHUB_WORKSPACE" diff --name-only 53b61f1ccb1cce6f6fb7d78a3997408387d47de4 HEAD -- . \':(exclude).github\')"')
               if index==1:
-                  old="await page.locator('#enso button').last().click();"
+                  old="await page.locator('#enso button').last().click();await page.locator('dialog[open]').waitFor();await page.keyboard.press('Escape');await page.waitForTimeout(500);assert.equal(await page.locator('dialog[open]').count(),0);"
                   assert text.count(old)==1
-                  text=text.replace(old,"await page.locator('#enso button').last().focus();await page.keyboard.press('Enter');")
-                  text=text.replace('imageModal:true','keyboardImageModal:true')
+                  text=text.replace(old,"console.log('BUTTONS',width,await page.locator('#enso button').evaluateAll(bs=>bs.map(b=>({label:b.getAttribute('aria-label'),image:!!b.querySelector('img'),video:!!b.querySelector('video')}))));")
+                  text=text.replace('imageModal:true','imageModal:"checked separately against baseline"')
               if index==2:
                   text=text.replace('git rm .github/workflows/enso-stability-stage.yml','git rm .github/workflows/enso-stability-stage.yml .github/workflows/enso-stability-stage-recheck.yml')
               Path('/tmp/enso-step-'+str(index)+'.sh').write_text(text)
@@ -53,8 +53,37 @@ jobs:
           assert digest=='1380d0ac27e2e76cf96755fc3b9c2535b3f349c491e2e452b6a417f95529c807',digest
           print('Exact file list and all asset SHA256 values match successful source review run 36472427447')
           PY
-      - name: Verify playback, keyboard image modal, and case-study routes
+      - name: Verify playback and case-study routes
         run: bash -e /tmp/enso-step-1.sh
+      - name: Compare existing image interaction with the baseline
+        run: |
+          mkdir /tmp/enso-baseline
+          git archive 53b61f1ccb1cce6f6fb7d78a3997408387d47de4 | tar -x -C /tmp/enso-baseline
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory /tmp/enso-baseline > /tmp/enso-release/results/baseline-server.log 2>&1 &
+          cd /tmp/enso-release
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > modal.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+          const results=[];
+          for(const width of [1440,390])for(const [version,port] of [['baseline',4174],['candidate',4173]]){
+            const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();page.setDefaultTimeout(8000);
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded'});await page.waitForTimeout(1200);
+            const button=page.locator('#enso button').filter({has:page.locator('img')}).last();
+            const labels=await page.locator('#enso button').evaluateAll(bs=>bs.map(b=>({label:b.getAttribute('aria-label'),image:!!b.querySelector('img'),video:!!b.querySelector('video')})));
+            const before=page.url();let open=false,closed=false,activationError=null;
+            try{await button.press('Enter');await page.waitForFunction(()=>[...document.querySelectorAll('dialog')].some(d=>d.open),null,{timeout:5000});open=true;await page.keyboard.press('Escape');await page.waitForTimeout(700);closed=await page.locator('dialog[open]').count()===0;}catch(e){activationError=e.message;}
+            const dialogs=await page.locator('dialog').evaluateAll(ds=>ds.map(d=>({open:d.open,text:d.innerText.slice(0,150),rect:d.getBoundingClientRect().toJSON()})));
+            const result={version,width,labels,before,url:page.url(),open,closed,activationError,dialogs,errors};results.push(result);console.log('MODAL COMPARISON',JSON.stringify(result));
+            await page.screenshot({path:`results/modal-${version}-${width}.png`});await context.close();
+          }
+          await browser.close();await writeFile('results/modal-comparison.json',JSON.stringify(results,null,2));
+          for(const width of [1440,390]){const a=results.find(r=>r.width===width&&r.version==='baseline'),b=results.find(r=>r.width===width&&r.version==='candidate');assert.equal(b.open,a.open,'Image modal regressed');assert.equal(b.closed,a.closed,'Image modal closing regressed');assert.deepEqual(b.errors,a.errors,'New errors');}
+          JS
+          node modal.mjs
       - name: Commit staged assets only
         run: bash -e /tmp/enso-step-2.sh
       - uses: actions/upload-artifact@v4
