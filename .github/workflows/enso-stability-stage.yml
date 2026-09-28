@@ -1,0 +1,170 @@
+name: Stage Ensō stability release
+on:
+  push:
+    branches: [release/enso-stability-20260928]
+    paths: [.github/workflows/enso-stability-stage.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare checked source-equivalent assets
+        run: |
+          mkdir -p /tmp/enso-release/results
+          cd /tmp/enso-release
+          npm init -y >/dev/null
+          npm install --save-exact typescript@5.9.3 playwright-core@1.55.1 >/dev/null
+          cat > preview-helper.ts <<'TS'
+          function startMerchPreview(element: HTMLVideoElement, automatic = false) {
+            const gallery = element.closest('#enso');
+            const previews = Array.from(gallery?.querySelectorAll<HTMLVideoElement>('video') ?? []);
+            // Decide before play(): pausing on the asynchronous play event is too late.
+            if (automatic && previews.some(other => other !== element && !other.paused)) return;
+            previews.forEach(other => {
+              if (other !== element) other.pause();
+            });
+            void element.play().catch(() => {});
+          }
+          TS
+          node - <<'JS'
+          const ts=require('typescript'),fs=require('fs');
+          fs.writeFileSync('preview-helper.js',ts.transpileModule(fs.readFileSync('preview-helper.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,removeComments:true}}).outputText);
+          JS
+          cat > patch-site.py <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import re,hashlib,json,sys
+          root=Path(sys.argv[1]);helper=Path('preview-helper.js').read_text()
+          module=root/'assets/PortfolioMotion-BY701fA3.js';oldmodule=module.read_text()
+          pattern=r'([A-Za-z_$][\w$]*)\.play\(\)\.catch\(\(\)=>\{\}\)'
+          matches=list(re.finditer(pattern,oldmodule));assert len(matches)==2
+          print('PLAYBACK LOCATIONS',[(oldmodule[max(0,m.start()-180):m.end()+100]) for m in matches])
+          newmodule=oldmodule
+          for i,m in reversed(list(enumerate(matches))):
+              replacement='startMerchPreview('+m.group(1)+(',true' if i==0 else '')+')'
+              newmodule=newmodule[:m.start()]+replacement+newmodule[m.end():]
+          assert 'function startMerchPreview' not in oldmodule
+          newmodule+='\n'+helper
+          csspath=root/'assets/index-BAkL0943.css';css=csspath.read_text()
+          rules=re.findall(r'@font-face\{[^}]*Jules Aeonik[^}]*\}',css);assert len(rules)==2
+          for rule in rules:
+              assert 'font-display:swap' in rule
+              css=css.replace(rule,rule.replace('font-display:swap','font-display:optional'))
+          css,n=re.subn(r'--font-portfolio:[^;}]+','--font-portfolio:"Jules Aeonik",Arial,sans-serif',css);assert n==1
+          version=hashlib.sha256((newmodule+css).encode()).hexdigest()[:10]
+          mapping={module.name:f'PortfolioMotion-stable-{version}.js',csspath.name:f'index-stable-{version}.css'}
+          originals={p:p.read_text() for p in root.rglob('*') if p.is_file() and '.git' not in p.parts and '.github' not in p.parts and p.suffix in ['.html','.rsc','.js','.json','.css']}
+          while True:
+              extra={p.name:p.stem+f'-stable-{version}'+p.suffix for p,s in originals.items() if p.suffix=='.js' and p.name not in mapping and any(old in s for old in mapping)}
+              if not extra:break
+              mapping.update(extra)
+          def renamed(s):
+              for old,new in mapping.items():s=s.replace(old,new)
+              return s
+          class VisibleText(HTMLParser):
+              def __init__(self):super().__init__();self.hidden=0;self.parts=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag in ['script','style']:self.hidden+=1
+              def handle_endtag(self,tag):
+                  if tag in ['script','style']:self.hidden-=1
+              def handle_data(self,data):
+                  if not self.hidden:self.parts.append(data)
+          changed=[]
+          for p,original in originals.items():
+              s=newmodule if p==module else css if p==csspath else original
+              if p.suffix=='.rsc':
+                  raw=s.encode()
+                  for m in re.finditer(rb'(?:^|\n)[a-f0-9]+:T([a-f0-9]+),',raw):
+                      payload=raw[m.end():m.end()+int(m.group(1),16)]
+                      assert not any(old.encode() in payload for old in mapping),'Length-prefixed Flight text requires re-encoding'
+              s=renamed(s)
+              if p.suffix=='.html' and '</head>' in s:
+                  links=''.join('<link rel="preload" href="/fonts/'+f+'.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>' for f in ['AeonikPro-Regular','AeonikPro-Bold'])
+                  s=s.replace('</head>',links+'</head>',1)
+                  before=VisibleText();after=VisibleText();before.feed(original);after.feed(s);assert before.parts==after.parts,'Visible copy changed'
+              dest=p.with_name(mapping.get(p.name,p.name))
+              if s!=original or dest!=p:
+                  dest.write_text(s);changed.append(str(dest.relative_to(root)))
+          manifest={'version':version,'mapping':mapping,'changed':sorted(changed),'sha256':{p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in changed}}
+          Path('results/deployment-manifest.json').write_text(json.dumps(manifest,indent=2))
+          print('PREPARED',version,len(changed),'files; visible HTML copy unchanged')
+          PY
+          test "$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD^)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          python3 patch-site.py "$GITHUB_WORKSPACE"
+          git -C "$GITHUB_WORKSPACE" diff --check
+      - name: Verify routes, playback, and interactions
+        run: |
+          cd /tmp/enso-release
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > server.py <<'PY'
+          from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
+          import os
+          from pathlib import Path
+          os.chdir(os.environ['GITHUB_WORKSPACE'])
+          class Handler(SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  path=self.path.split('?')[0]
+                  if path=='/.rsc':self.path='/index.rsc'
+                  elif not Path('.'+path).exists() and Path('.'+path+'.html').is_file():self.path=path+'.html'
+                  super().do_GET()
+          ThreadingHTTPServer(('127.0.0.1',4173),Handler).serve_forever()
+          PY
+          python3 server.py > results/server.log 2>&1 &
+          cat > smoke.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import assert from 'node:assert/strict';
+          import {writeFile} from 'node:fs/promises';
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+          const results=[];
+          for(const width of [1440,390]){
+            const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});
+            await page.waitForTimeout(1500);
+            await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(1500);
+            const videos=page.locator('#enso video');
+            assert.equal(await videos.evaluateAll(vs=>vs.filter(v=>!v.paused).length),1);
+            const second=videos.nth(1),button=second.locator('..');await second.scrollIntoViewIfNeeded();await page.waitForTimeout(400);
+            if(await second.evaluate(v=>!v.paused)){await button.click();await page.waitForTimeout(200)}
+            await button.click();await page.waitForFunction(()=>{const v=document.querySelectorAll('#enso video')[1];return !v.paused&&v.currentTime>0.1});
+            assert.equal(await videos.evaluateAll(vs=>vs.filter(v=>!v.paused).length),1);
+            await button.click();await page.waitForTimeout(200);assert(await second.evaluate(v=>v.paused));
+            await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(300);
+            assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
+            await page.screenshot({path:`results/staged-${width}.png`});
+            await page.locator('#enso button').last().click();await page.locator('dialog[open]').waitFor();await page.keyboard.press('Escape');await page.waitForTimeout(500);assert.equal(await page.locator('dialog[open]').count(),0);
+            assert.deepEqual(errors,[]);results.push({width,clicks:true,manualPlayback:true,imageModal:true,errors});await context.close();
+          }
+          for(const slug of ['grok-builders-night','grok-builders-night-sf','padelcon','backers-and-builders','zerion-supper-club-london']){
+            const context=await browser.newContext(),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            const r=await page.goto('http://127.0.0.1:4173/work/'+slug,{waitUntil:'domcontentloaded'});assert.equal(r.status(),200);await page.waitForTimeout(300);assert(await page.locator('h1').count());assert.deepEqual(errors,[]);results.push({slug,pass:true});await context.close();
+          }
+          await browser.close();await writeFile('results/smoke.json',JSON.stringify(results,null,2));console.log('STAGED CHECKS PASS',JSON.stringify(results));
+          JS
+          node smoke.mjs
+      - name: Commit staged assets only, without publishing
+        run: |
+          test "$(git ls-remote origin refs/heads/gh-pages | cut -f1)" = 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
+          git rm .github/workflows/enso-stability-stage.yml
+          python3 - <<'PY'
+          import json,subprocess
+          manifest=json.load(open('/tmp/enso-release/results/deployment-manifest.json'))
+          subprocess.run(['git','add','--',*manifest['changed']],check=True)
+          PY
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Stage stable fonts and single-preview playback with versioned asset imports'
+          git push origin HEAD:refs/heads/release/enso-stability-20260928
+          git rev-parse HEAD > /tmp/enso-release/results/release-commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-staged-release
+          path: /tmp/enso-release/results/
+          retention-days: 3
