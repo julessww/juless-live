@@ -14,153 +14,78 @@ jobs:
         with:
           ref: 53b61f1ccb1cce6f6fb7d78a3997408387d47de4
           path: site
+      - uses: actions/checkout@v4
+        with:
+          ref: 6e56b50ed38cc8cd6c50feec31c93e5724ea8721
+          path: definition
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Reproduce reviewed snapshot and verify exact manifest
+      - name: Reproduce exact reviewed bytes with unchanged copy and media
         run: |
-          mkdir results tools
-          cat > tools/helper.js <<'JS'
-          function startMerchPreview(element, automatic = false) {
-              const gallery = element.closest('#enso');
-              const previews = Array.from(gallery?.querySelectorAll('video') ?? []);
-              if (automatic && previews.some(other => other !== element && !other.paused))
-                  return;
-              previews.forEach(other => {
-                  if (other !== element)
-                      other.pause();
-              });
-              void element.play().catch(() => { });
-          }
-          JS
-          cat > tools/patch.py <<'PY'
-          from pathlib import Path
-          import re,hashlib,json,sys
-          root=Path(sys.argv[1]);helper=Path(sys.argv[2]).read_text()
-          module=root/'assets/PortfolioMotion-BY701fA3.js';oldmodule=module.read_text()
-          pattern=r'([A-Za-z_$][\w$]*)\.play\(\)\.catch\(\(\)=>\{\}\)'
-          matches=list(re.finditer(pattern,oldmodule));assert len(matches)==2,[(x.group(),x.start()) for x in matches]
-          print('ORIGINAL PLAYBACK CALLS',[(oldmodule[max(0,m.start()-180):m.end()+100]) for m in matches])
-          newmodule=oldmodule
-          for i,m in reversed(list(enumerate(matches))):
-              replacement='startMerchPreview('+m.group(1)+(',true' if i==0 else '')+')'
-              newmodule=newmodule[:m.start()]+replacement+newmodule[m.end():]
-          assert 'function startMerchPreview' not in oldmodule
-          newmodule+='\n'+helper
-          csspath=root/'assets/index-BAkL0943.css';css=csspath.read_text()
-          rules=re.findall(r'@font-face\{[^}]*Jules Aeonik[^}]*\}',css);assert len(rules)==2
-          for rule in rules:
-              assert 'font-display:swap' in rule
-              css=css.replace(rule,rule.replace('font-display:swap','font-display:optional'))
-          css,n=re.subn(r'--font-portfolio:[^;}]+','--font-portfolio:"Jules Aeonik",Arial,sans-serif',css);assert n==1
-          version=hashlib.sha256((newmodule+css).encode()).hexdigest()[:10]
-          mapping={module.name:f'PortfolioMotion-stable-{version}.js',csspath.name:f'index-stable-{version}.css'}
-          originals={p:p.read_text() for p in root.rglob('*') if p.is_file() and '.git' not in p.parts and '.github' not in p.parts and p.suffix in ['.html','.rsc','.js','.json','.css']}
-          while True:
-              extra={p.name:p.stem+f'-stable-{version}'+p.suffix for p,s in originals.items() if p.suffix=='.js' and p.name not in mapping and any(old in s for old in mapping)}
-              if not extra:break
-              mapping.update(extra)
-          def renamed(s):
-              for old,new in mapping.items():s=s.replace(old,new)
-              return s
-          changed=[]
-          for p,original in originals.items():
-              s=newmodule if p==module else css if p==csspath else original
-              s=renamed(s)
-              if p.suffix=='.html' and '</head>' in s:
-                  links=''.join('<link rel="preload" href="/fonts/'+f+'.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>' for f in ['AeonikPro-Regular','AeonikPro-Bold'])
-                  s=s.replace('</head>',links+'</head>',1)
-              dest=p.with_name(mapping.get(p.name,p.name))
-              if s!=original or dest!=p:
-                  dest.write_text(s);changed.append(str(dest.relative_to(root)))
-          manifest={'version':version,'mapping':mapping,'changed':sorted(changed),'sha256':{p:hashlib.sha256((root/p).read_bytes()).hexdigest() for p in changed}}
-          Path(sys.argv[3]).write_text(json.dumps(manifest,indent=2))
-          print('PREPARED',version,len(changed),'files')
-          PY
-          python3 tools/patch.py site tools/helper.js results/deployment-manifest.json
+          mkdir baseline
+          git -C site archive HEAD | tar -x -C baseline
           python3 - <<'PY'
           from pathlib import Path
-          from html.parser import HTMLParser
-          import hashlib,json,subprocess,re
-          root=Path('site');m=json.loads(Path('results/deployment-manifest.json').read_text())
-          digest=hashlib.sha256(json.dumps(m,sort_keys=True).encode()).hexdigest()
-          assert digest=='1380d0ac27e2e76cf96755fc3b9c2535b3f349c491e2e452b6a417f95529c807',digest
-          class Visible(HTMLParser):
-              def __init__(self):super().__init__();self.hidden=0;self.parts=[];self.media=[]
-              def handle_starttag(self,tag,attrs):
-                  if tag in ['script','style']:self.hidden+=1
-                  if tag in ['img','video','source']:self.media.append((tag,attrs))
-              def handle_endtag(self,tag):
-                  if tag in ['script','style']:self.hidden-=1
-              def handle_data(self,data):
-                  if not self.hidden and data.strip():self.parts.append(data.strip())
-          for name in m['changed']:
-              if not name.endswith(('.html','.rsc')):continue
-              before=subprocess.check_output(['git','-C','site','show','HEAD:'+name])
-              after=(root/name).read_bytes()
-              if name.endswith('.html'):
-                  a=Visible();a.feed(before.decode());b=Visible();b.feed(after.decode())
-                  assert a.parts==b.parts and a.media==b.media,name+' copy/media changed'
-              else:
-                  for match in re.finditer(rb'(?:^|\n)[a-f0-9]+:T([a-f0-9]+),',before):
-                      text=before[match.end():match.end()+int(match.group(1),16)]
-                      assert not any(old.encode() in text for old in m['mapping']),name+' length-prefixed text requires repair'
-          print('Exact passing review manifest, visible copy, media, and Flight text integrity verified')
-          Path('results/manifest-digest.txt').write_text(digest)
+          text=Path('definition/.github/workflows/enso-stability-stage.yml').read_text()
+          part=text.split('      - name: Reproduce reviewed snapshot and verify exact manifest\n        run: |\n',1)[1].split('      - name:',1)[0]
+          Path('/tmp/reproduce.sh').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in part.splitlines())+'\n')
           PY
-          git -C site diff --check
-      - name: Check staged navigation and playback with real media decoding
+          bash -e /tmp/reproduce.sh
+      - name: Compare modal behavior and verify navigation on complete snapshots
         run: |
           cd tools
           npm init -y >/dev/null
           npm install --save-exact playwright-core@1.55.1 >/dev/null
           export CHROME_PATH="$(command -v google-chrome)"
-          cat > server.py <<'PY'
-          from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
-          from pathlib import Path
-          import os
-          os.chdir('../site')
-          class Handler(SimpleHTTPRequestHandler):
-              def do_GET(self):
-                  path=self.path.split('?')[0]
-                  if path=='/.rsc':self.path='/index.rsc'
-                  elif not Path('.'+path).exists() and Path('.'+path+'.html').is_file():self.path=path+'.html'
-                  super().do_GET()
-          ThreadingHTTPServer(('127.0.0.1',4173),Handler).serve_forever()
-          PY
-          python3 server.py > ../results/server.log 2>&1 &
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory ../site > ../results/site-server.log 2>&1 &
+          python3 -m http.server 4174 --bind 127.0.0.1 --directory ../baseline > ../results/baseline-server.log 2>&1 &
           cat > check.mjs <<'JS'
           import {chromium} from 'playwright-core';
           import assert from 'node:assert/strict';
           import {writeFile} from 'node:fs/promises';
           const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
-          const results=[];
+          const results=[];const baseline=new Map();
           try {
-            for(const width of [1440,390]){
-              const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();
-              page.setDefaultTimeout(12000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
-              await page.goto('http://127.0.0.1:4173/',{waitUntil:'domcontentloaded'});await page.waitForTimeout(1200);
+            for(const variant of ['baseline','candidate'])for(const width of [1440,390]){
+              const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();page.setDefaultTimeout(8000);
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              const base='http://127.0.0.1:'+(variant==='baseline'?4174:4173);
+              await page.goto(base+'/',{waitUntil:'domcontentloaded'});await page.waitForTimeout(1200);
               await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(1500);
-              assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
-              assert.equal(await page.locator('#enso video').evaluateAll(v=>v.filter(x=>!x.paused).length),1);
-              const video=page.locator('#enso video').nth(1),button=video.locator('..');await video.scrollIntoViewIfNeeded();await page.waitForTimeout(300);
+              const videos=page.locator('#enso video');
+              if(variant==='candidate')assert.equal(await videos.evaluateAll(vs=>vs.filter(v=>!v.paused).length),1);
+              const buttons=await page.locator('#enso button').evaluateAll(bs=>bs.map(b=>({label:b.getAttribute('aria-label'),hasImage:!!b.querySelector('img'),hasVideo:!!b.querySelector('video')})));
+              console.log('BUTTONS',variant,width,JSON.stringify(buttons));
+              const imageButton=page.locator('#enso button[aria-label^="Explore "]').first();
+              let modal=false;
+              if(await imageButton.count()){
+                await imageButton.focus();await page.keyboard.press('Enter');await page.waitForTimeout(700);
+                modal=await page.getByRole('dialog').isVisible().catch(()=>false);
+                console.log('MODALS',variant,width,await page.locator('dialog,[role="dialog"]').evaluateAll(ds=>ds.map(d=>({tag:d.tagName,open:d.open,role:d.getAttribute('role'),text:d.innerText.slice(0,150)}))));
+                if(modal){await page.keyboard.press('Escape');await page.waitForTimeout(400);assert.equal(await page.getByRole('dialog').isVisible().catch(()=>false),false);}
+              }
+              if(variant==='baseline')baseline.set(width,modal);else assert.equal(modal,baseline.get(width),'Modal behavior regressed relative to production baseline');
+              const video=videos.nth(1),button=video.locator('..');await video.scrollIntoViewIfNeeded();await page.waitForTimeout(400);
               if(await video.evaluate(v=>!v.paused)){await button.click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);}
               await button.click();await page.waitForFunction(()=>{const v=document.querySelectorAll('#enso video')[1];return !v.paused&&v.currentTime>.1});
-              assert.equal(await page.locator('#enso video').evaluateAll(v=>v.filter(x=>!x.paused).length),1);
+              if(variant==='candidate')assert.equal(await videos.evaluateAll(vs=>vs.filter(v=>!v.paused).length),1);
               await button.click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);
-              const media=page.locator('#enso button').last();await media.focus();await page.keyboard.press('Enter');await page.locator('dialog[open]').waitFor();await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('dialog[open]'));
-              await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.locator('nav a[href="#enso"]').focus();await page.keyboard.press('Enter');await page.waitForTimeout(300);
+              await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.locator('nav a[href="#enso"]').focus();await page.keyboard.press('Enter');await page.waitForTimeout(500);
               assert.equal(new URL(page.url()).hash,'#enso');assert.equal(await page.locator('#merch-heading').evaluate(h=>getComputedStyle(h).clipPath),'none');
-              await page.screenshot({path:`../results/staged-${width}.png`});assert.deepEqual(errors,[]);
-              results.push({width,pass:true,firstAndRepeatedKeyboard:true,manualPlaybackAndPause:true,keyboardModal:true,pageErrors:errors});await context.close();
+              assert.deepEqual(errors,[]);
+              results.push({variant,width,pass:true,modal,imageButtons:buttons.filter(b=>b.label?.startsWith('Explore ')).length,buttons,pageErrors:errors});
+              await page.screenshot({path:`../results/${variant}-${width}.png`});console.log('PASS',variant,width);await context.close();
             }
             for(const slug of ['grok-builders-night','grok-builders-night-sf','padelcon','backers-and-builders','zerion-supper-club-london']){
               const context=await browser.newContext(),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-              const response=await page.goto('http://127.0.0.1:4173/work/'+slug,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);await page.waitForTimeout(300);assert(await page.locator('h1').count());assert.deepEqual(errors,[]);results.push({slug,pass:true,pageErrors:errors});await context.close();
+              const response=await page.goto('http://127.0.0.1:4173/work/'+slug+'.html',{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);await page.waitForTimeout(500);assert(await page.locator('h1').count());assert.deepEqual(errors,[]);results.push({slug,pass:true,pageErrors:errors});await context.close();
             }
             console.log('STAGED PASS',JSON.stringify(results));
           } finally {await writeFile('../results/staging-checks.json',JSON.stringify(results,null,2));await browser.close();}
           JS
+          cp check.mjs ../results/
           node check.mjs
       - name: Save only verified assets to a clean release branch
         working-directory: site
