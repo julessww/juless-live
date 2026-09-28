@@ -1,0 +1,107 @@
+name: Verify live Ensō 5ca2444a86
+on:
+  push:
+    branches: [verify/enso-exact-5ca2444a86]
+    paths: [.github/workflows/enso-live-5ca2444a86.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify published files and browser behavior
+        run: |
+          npm init -y >/dev/null
+          npm install --save-exact playwright-core@1.55.1 >/dev/null
+          mkdir results
+          export CHROME_PATH="$(command -v google-chrome)"
+          cat > live.mjs <<'JS'
+          import {chromium} from 'playwright-core';
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import {writeFile} from 'node:fs/promises';
+          const base='https://jules.social';
+          const version='5ca2444a86';
+          const expected={
+            '/assets/PortfolioMotion-stable-5ca2444a86.js':'67fea1c2339d9895b4ac0d852eb69a11634d061fbb2f4cb4c2cd55473a8bffe7',
+            '/assets/index-stable-5ca2444a86.css':'e31c6328b485bfe9fced564dc7b607c9ddac70d8d4b95faff52e64509c9dccea',
+            '/assets/index-C0w-mBvX-stable-5ca2444a86.js':'491a66f653ee7c08e9017d7751022013dcae48ba353b9028fb0aab2d795548c0'
+          };
+          const sha=b=>createHash('sha256').update(b).digest('hex');
+          let delivered=false;
+          for(let i=0;i<24;i++){
+            const r=await fetch(base+'/',{signal:AbortSignal.timeout(10000),headers:{'Cache-Control':'no-cache'}});
+            const html=await r.text();
+            if(r.ok&&html.includes('PortfolioMotion-stable-'+version)&&html.includes('index-stable-'+version)){delivered=true;break;}
+            console.log('Waiting for published version',i,r.status);
+            await new Promise(r=>setTimeout(r,8000));
+          }
+          assert(delivered,'New homepage asset references not yet published');
+          for(const [path,digest] of Object.entries(expected)){
+            const r=await fetch(base+path,{signal:AbortSignal.timeout(10000)});
+            assert.equal(r.status,200);assert.equal(sha(Buffer.from(await r.arrayBuffer())),digest);
+            console.log('LIVE BYTE MATCH',path);
+          }
+          const browser=await chromium.launch({executablePath:process.env.CHROME_PATH});
+          const results=[];
+          for(const width of [1440,390])for(const mode of ['fresh','delayed-fonts']){
+            const context=await browser.newContext({viewport:{width,height:900}});
+            if(mode==='delayed-fonts')await context.route(/\.woff2?(\?|$)/,async route=>{await new Promise(r=>setTimeout(r,2500));await route.continue().catch(()=>{});});
+            await context.addInitScript(()=>{
+              window.__ready=false;window.__reveals=0;window.__frames=[];
+              const add=EventTarget.prototype.addEventListener;
+              EventTarget.prototype.addEventListener=function(...a){if(this instanceof HTMLElement&&this.tagName==='MAIN'&&a[0]==='click')window.__ready=true;return add.apply(this,a)};
+              const animate=Element.prototype.animate;
+              Element.prototype.animate=function(...a){if(this.id==='merch-heading')window.__reveals++;return animate.apply(this,a)};
+              window.__sample=()=>{const start=performance.now();window.__frames=[];function frame(){const h=document.getElementById('merch-heading');window.__frames.push({t:performance.now()-start,y:scrollY,top:h.getBoundingClientRect().top,doc:document.documentElement.scrollHeight,clip:getComputedStyle(h).clipPath,playing:[...document.querySelectorAll('#enso video')].filter(v=>!v.paused).length});if(performance.now()-start<3200)requestAnimationFrame(frame)}requestAnimationFrame(frame)};
+            });
+            const page=await context.newPage();page.setDefaultTimeout(20000);
+            const errors=[];page.on('pageerror',e=>errors.push(e.message));
+            const pending=Object.keys(expected).map(path=>page.waitForResponse(r=>r.url()===base+path));
+            try{
+              const r=await page.goto(base+'/',{waitUntil:'domcontentloaded'});assert.equal(r.status(),200);
+              for(const response of await Promise.all(pending)){const path=new URL(response.url()).pathname;assert.equal(sha(await response.body()),expected[path]);}
+              await page.waitForFunction(()=>window.__ready);
+              await page.locator('nav a[href="#enso"]').click();
+              await page.evaluate(()=>window.__sample());await page.waitForTimeout(3500);
+              const frames=await page.evaluate(()=>window.__frames),after=frames.filter(f=>f.t>150),last=frames.at(-1);
+              assert(after.length>10);assert(after.every(f=>f.playing<=1),'Competing preview videos');
+              assert.equal(last.clip,'none');assert(last.top>0&&last.top<900);assert.equal(await page.evaluate(()=>window.__reveals),0);
+              if(mode==='delayed-fonts'){
+                assert(Math.max(...after.map(f=>f.y))-Math.min(...after.map(f=>f.y))<=1,'Late font scroll correction');
+                assert(Math.max(...after.map(f=>f.doc))-Math.min(...after.map(f=>f.doc))<=1,'Late font document-height shift');
+              }
+              await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+              await page.locator('nav a[href="#enso"]').click();await page.waitForTimeout(350);
+              assert.equal(new URL(page.url()).hash,'#enso');assert.equal(await page.evaluate(()=>window.__reveals),0);
+              if(mode==='fresh'){
+                const second=page.locator('#enso video').nth(1),button=second.locator('..');
+                await second.scrollIntoViewIfNeeded();await page.waitForTimeout(500);
+                if(await second.evaluate(v=>!v.paused)){await button.click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);}
+                await button.click();await page.waitForFunction(()=>{const v=document.querySelectorAll('#enso video')[1];return !v.paused&&v.currentTime>0.1});
+                assert.equal(await page.locator('#enso video').evaluateAll(vs=>vs.filter(v=>!v.paused).length),1);
+                await button.click();await page.waitForFunction(()=>document.querySelectorAll('#enso video')[1].paused);
+              }
+              assert.deepEqual(errors,[]);
+              await page.screenshot({path:`results/live-${width}-${mode}.png`});
+              const gaps=frames.slice(1).map((f,i)=>f.t-frames[i].t).sort((a,b)=>a-b);
+              results.push({width,mode,pass:true,last,medianFrameMs:gaps[Math.floor(gaps.length/2)]});
+            }catch(e){results.push({width,mode,pass:false,error:e.message,pageErrors:errors});}
+            console.log('LIVE RESULT',JSON.stringify(results.at(-1)));
+            await context.close();
+          }
+          await browser.close();
+          await writeFile('results/live-results.json',JSON.stringify({version,expected,results},null,2));
+          assert(results.every(r=>r.pass),'One or more live scenarios failed');
+          JS
+          node live.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enso-live-5ca2444a86
+          path: results/
+          retention-days: 3
