@@ -10,7 +10,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "assets/layout-segment-context-CCPeRPAF.js",
+    "file": "assets/layout-segment-context-CEojBTOQ.js",
     "name": "layout-segment-context",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -21,7 +21,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js": {
-    "file": "assets/link-DFwxUPrU.js",
+    "file": "assets/link-BfNVk6_1.js",
     "name": "link",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -35,7 +35,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js": {
-    "file": "assets/router-D19bQkeo.js",
+    "file": "assets/router-C5PraJ6Q.js",
     "name": "router",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js",
     "isDynamicEntry": true,
@@ -94,7 +94,7 @@
     ]
   },
   "app/motion-concepts/MotionConcept.tsx": {
-    "file": "assets/MotionConcept-D-udO_G4.js",
+    "file": "assets/MotionConcept-2wbu1xAt.js",
     "name": "MotionConcept",
     "src": "app/motion-concepts/MotionConcept.tsx",
     "isDynamicEntry": true,
@@ -172,7 +172,7 @@
     ]
   },
   "app/v2/PortfolioMotion.tsx": {
-    "file": "assets/PortfolioMotion-B36ywgVF.js",
+    "file": "assets/PortfolioMotion-CWPY5ech.js",
     "name": "PortfolioMotion",
     "src": "app/v2/PortfolioMotion.tsx",
     "isDynamicEntry": true,
@@ -230,7 +230,7 @@
     "isDynamicEntry": true
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "assets/index-Cz6m-Hx7.js",
+    "file": "assets/index-DglzgkJu.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
