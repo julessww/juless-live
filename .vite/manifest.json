@@ -10,7 +10,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "assets/layout-segment-context-CRMT8f9M.js",
+    "file": "assets/layout-segment-context-C7tgXpKs.js",
     "name": "layout-segment-context",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -21,7 +21,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js": {
-    "file": "assets/link-3M5gvWe8.js",
+    "file": "assets/link-BtE6I3eq.js",
     "name": "link",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -35,7 +35,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js": {
-    "file": "assets/router-BkANMBPk.js",
+    "file": "assets/router-CUz9lJe3.js",
     "name": "router",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js",
     "isDynamicEntry": true,
@@ -49,15 +49,15 @@
       "_framework-CXnKph_e.js"
     ]
   },
-  "_V2Portfolio-a7gBSWY_.css": {
-    "file": "assets/V2Portfolio-a7gBSWY_.css",
-    "src": "_V2Portfolio-a7gBSWY_.css"
+  "_V2Portfolio-DIvzN2rE.css": {
+    "file": "assets/V2Portfolio-DIvzN2rE.css",
+    "src": "_V2Portfolio-DIvzN2rE.css"
   },
-  "_V2Portfolio.module-mHY7pdnT.js": {
-    "file": "assets/V2Portfolio.module-mHY7pdnT.js",
+  "_V2Portfolio.module-BIvehN6h.js": {
+    "file": "assets/V2Portfolio.module-BIvehN6h.js",
     "name": "V2Portfolio.module",
     "css": [
-      "assets/V2Portfolio-a7gBSWY_.css"
+      "assets/V2Portfolio-DIvzN2rE.css"
     ]
   },
   "_check-BOKWwQmK.js": {
@@ -94,7 +94,7 @@
     ]
   },
   "app/motion-concepts/MotionConcept.tsx": {
-    "file": "assets/MotionConcept-ClusyB6e.js",
+    "file": "assets/MotionConcept-BlfAwwB2.js",
     "name": "MotionConcept",
     "src": "app/motion-concepts/MotionConcept.tsx",
     "isDynamicEntry": true,
@@ -110,7 +110,7 @@
     ]
   },
   "app/v2/ContactLinks.tsx": {
-    "file": "assets/ContactLinks-CDvxEvXb.js",
+    "file": "assets/ContactLinks-C__QbAVk.js",
     "name": "ContactLinks",
     "src": "app/v2/ContactLinks.tsx",
     "isDynamicEntry": true,
@@ -118,7 +118,7 @@
       "app/v2/CopyEmailButton.tsx",
       "_linkedin-C0XMGgUR.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-mHY7pdnT.js"
+      "_V2Portfolio.module-BIvehN6h.js"
     ]
   },
   "app/v2/CopyEmailButton.tsx": {
@@ -136,7 +136,7 @@
     ]
   },
   "app/v2/DraggableBotanical.tsx": {
-    "file": "assets/DraggableBotanical-CCKNpTrP.js",
+    "file": "assets/DraggableBotanical-CuIlAOq0.js",
     "name": "DraggableBotanical",
     "src": "app/v2/DraggableBotanical.tsx",
     "isDynamicEntry": true,
@@ -144,11 +144,11 @@
       "_rolldown-runtime-S-ySWqyJ.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-mHY7pdnT.js"
+      "_V2Portfolio.module-BIvehN6h.js"
     ]
   },
   "app/v2/EditorialScrollGallery.tsx": {
-    "file": "assets/EditorialScrollGallery-DTvfw-TG.js",
+    "file": "assets/EditorialScrollGallery-CGKh18dR.js",
     "name": "EditorialScrollGallery",
     "src": "app/v2/EditorialScrollGallery.tsx",
     "isDynamicEntry": true,
@@ -156,11 +156,11 @@
       "_rolldown-runtime-S-ySWqyJ.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-mHY7pdnT.js"
+      "_V2Portfolio.module-BIvehN6h.js"
     ]
   },
   "app/v2/MerchScrollGallery.tsx": {
-    "file": "assets/MerchScrollGallery-D6E07KUy.js",
+    "file": "assets/MerchScrollGallery-B94ZoEKv.js",
     "name": "MerchScrollGallery",
     "src": "app/v2/MerchScrollGallery.tsx",
     "isDynamicEntry": true,
@@ -168,11 +168,11 @@
       "_rolldown-runtime-S-ySWqyJ.js",
       "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/image.js",
       "_framework-CXnKph_e.js",
-      "_V2Portfolio.module-mHY7pdnT.js"
+      "_V2Portfolio.module-BIvehN6h.js"
     ]
   },
   "app/v2/PortfolioMotion.tsx": {
-    "file": "assets/PortfolioMotion-CF0BlvwX.js",
+    "file": "assets/PortfolioMotion-Bo49f04n.js",
     "name": "PortfolioMotion",
     "src": "app/v2/PortfolioMotion.tsx",
     "isDynamicEntry": true,
@@ -194,7 +194,7 @@
     ]
   },
   "app/v2/ScrollMotion.tsx": {
-    "file": "assets/ScrollMotion-BaxCLKQI.js",
+    "file": "assets/ScrollMotion-CK-qgkqn.js",
     "name": "ScrollMotion",
     "src": "app/v2/ScrollMotion.tsx",
     "isDynamicEntry": true,
@@ -230,7 +230,7 @@
     "isDynamicEntry": true
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "assets/index-DKW68SNz.js",
+    "file": "assets/index-DkktAfm8.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
