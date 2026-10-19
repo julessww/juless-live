@@ -10,7 +10,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "assets/layout-segment-context-DX3wlRUH.js",
+    "file": "assets/layout-segment-context-DTOOkLSY.js",
     "name": "layout-segment-context",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -21,7 +21,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js": {
-    "file": "assets/link-Bm_WLmVC.js",
+    "file": "assets/link-71U46RNg.js",
     "name": "link",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -35,7 +35,7 @@
     ]
   },
   "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js": {
-    "file": "assets/router-gmf1sKFq.js",
+    "file": "assets/router-Yzm7IRUx.js",
     "name": "router",
     "src": "../../../Users/julienneworring/Documents/Codex/2026-06-30/sites-plugin-sites-openai-bundled-create/node_modules/vinext/dist/shims/router.js",
     "isDynamicEntry": true,
@@ -94,7 +94,7 @@
     ]
   },
   "app/motion-concepts/MotionConcept.tsx": {
-    "file": "assets/MotionConcept-OqUrxWGv.js",
+    "file": "assets/MotionConcept-j6krHj6Z.js",
     "name": "MotionConcept",
     "src": "app/motion-concepts/MotionConcept.tsx",
     "isDynamicEntry": true,
@@ -172,7 +172,7 @@
     ]
   },
   "app/v2/PortfolioMotion.tsx": {
-    "file": "assets/PortfolioMotion-B1Php6_-.js",
+    "file": "assets/PortfolioMotion-BWvD-quc.js",
     "name": "PortfolioMotion",
     "src": "app/v2/PortfolioMotion.tsx",
     "isDynamicEntry": true,
@@ -224,13 +224,13 @@
     ]
   },
   "app/v2/cassette-scene.ts": {
-    "file": "assets/cassette-scene-D1wGtGix.js",
+    "file": "assets/cassette-scene-DGrA-a1k.js",
     "name": "cassette-scene",
     "src": "app/v2/cassette-scene.ts",
     "isDynamicEntry": true
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "assets/index-Cx7lOm2T.js",
+    "file": "assets/index-C1xZKwfi.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
