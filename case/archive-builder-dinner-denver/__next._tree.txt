@@ -1,4 +1,4 @@
-:HL["/_next/static/css/7acda0d720f55ee6.css","style"]
+:HL["/_next/static/css/220296644532dee7.css","style"]
 :HL["/jules-chrome.webp","image"]
 :HL["/optimized/orbit/events/details-banana-florals.webp","image"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"case","param":null,"prefetchHints":0,"slots":{"children":{"name":"slug","param":{"type":"d","key":"archive-builder-dinner-denver","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"Lm_qF_JmXHKSkh53yM56Y"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"case","param":null,"prefetchHints":0,"slots":{"children":{"name":"slug","param":{"type":"d","key":"archive-builder-dinner-denver","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"k5_aC4kYHhjiRgCGv3lS_"}
