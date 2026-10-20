@@ -2,5 +2,5 @@
 2:I[6980,["980","static/chunks/980-495026deb26fb0d9.js","345","static/chunks/app/not-found-4428922d445c04db.js"],""]
 3:I[5252,[],"OutletBoundary"]
 4:"$Sreact.suspense"
-0:{"rsc":["$","$1","c",{"children":[["$","main",null,{"className":"case-panel","children":["$","section",null,{"className":"case-intro","children":[["$","p",null,{"className":"mono","children":"404"}],["$","h1",null,{"children":"Not here."}],["$","p",null,{"children":"This page has moved or no longer exists."}],["$","$L2",null,{"className":"back-link","href":"/","children":"Back to Selected Work"}]]}]}],null,["$","$L3",null,{"children":["$","$4",null,{"name":"Next.MetadataOutlet","children":"$@5"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"WIG2J4gGMiMNyFtTpu-OQ"}
+0:{"rsc":["$","$1","c",{"children":[["$","main",null,{"className":"case-panel","children":["$","section",null,{"className":"case-intro","children":[["$","p",null,{"className":"mono","children":"404"}],["$","h1",null,{"children":"Not here."}],["$","p",null,{"children":"This page has moved or no longer exists."}],["$","$L2",null,{"className":"back-link","href":"/","children":"Back to Selected Work"}]]}]}],null,["$","$L3",null,{"children":["$","$4",null,{"name":"Next.MetadataOutlet","children":"$@5"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"dfCEJ8yQtdNiAUzQakFf4"}
 5:null
