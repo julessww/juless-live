@@ -1,4 +1,4 @@
-:HL["/_next/static/css/8258d7d3959275e1.css","style"]
+:HL["/_next/static/css/94aab2b32989b12b.css","style"]
 :HL["/jules-chrome.webp","image"]
 :HL["/events/cannes-dinner-guests.jpg","image"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"work","param":null,"prefetchHints":0,"slots":{"children":{"name":"slug","param":{"type":"d","key":"salt-sunset-soiree-cannes","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"B5HGdUJwmtHEgL3M4Pefs"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"work","param":null,"prefetchHints":0,"slots":{"children":{"name":"slug","param":{"type":"d","key":"salt-sunset-soiree-cannes","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"dS8PlKi5Ii6nZq6noNJGY"}
